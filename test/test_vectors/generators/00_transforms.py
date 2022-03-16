@@ -41,6 +41,7 @@ class matmul_operators:
 
     def run(self) -> Dict[str, np.ndarray]:
         self.res['c'] = self.res['a'] @ self.res['b']
+        print(self.res['c'])
         return self.res
 
     def run_transpose(self) -> Dict[str, np.ndarray]:

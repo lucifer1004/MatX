@@ -11,7 +11,7 @@ set(target_inc  ${CMAKE_SOURCE_DIR}/include/
                 ${CMAKE_SOURCE_DIR}/include/kernels/ 
                 ${CMAKE_SOURCE_DIR}/test/include 
                 ${CMAKE_SOURCE_DIR}/examples/)
-set(system_inc  ${CUTLASS_INC} 
+set(system_inc  ${cutlass_SOURCE_DIR} 
                 ${pybind11_INCLUDE_DIR} 
                 ${PYTHON_INCLUDE_DIRS})
 

@@ -37,10 +37,8 @@
 #include "matx_tensor.h"
 #include <cublasLt.h>
 
-#if MATX_ENABLE_CUTLASS == 1
 #include "cutlass/gemm/device/gemm.h"
 #include "cutlass/gemm/device/gemm_batched.h"
-#endif
 
 #include <cstdio>
 #include <numeric>
@@ -79,12 +77,6 @@ union MatMulScaleType_t {
  * similar to that of a standard GEMM call
  */
 struct MatMulParams_t {
-  index_t a_rows = 0;
-  index_t a_cols = 0;
-  index_t b_rows = 0;
-  index_t b_cols = 0;
-  index_t c_rows = 0;
-  index_t c_cols = 0;
   index_t m = 0;
   index_t n = 0;
   index_t k = 0;
@@ -95,12 +87,10 @@ struct MatMulParams_t {
   MatXMatMulProvider_t prov;
   cudaStream_t stream;
   MatXDataType_t dtype;
-  cublasOperation_t opA;
-  cublasOperation_t opB;
 };
 
 template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB, 
-          MatXMatMulProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
+          MatXMatMulProvider_t PROV = PROVIDER_TYPE_CUTLASS>
 class matxMatMulHandle_t {
 public:
   using T1 = typename TensorTypeC::scalar_type;
@@ -142,8 +132,7 @@ public:
   matxMatMulHandle_t(TensorTypeC &c, const TensorTypeA &a,
                      const TensorTypeB &b)
   {
-    MATX_STATIC_ASSERT_STR((PROV != PROVIDER_TYPE_CUTLASS) || MATX_ENABLE_CUTLASS, matxMatMulError,
-                  "Must use -DCUTLASS_DIR in CMake to enable CUTLASS support");
+    static_assert(PROV == PROVIDER_TYPE_CUTLASS, "Only CUTLASS supported for GEMMs");
     static_assert(TensorTypeA::Rank() == TensorTypeB::Rank());
     static_assert(TensorTypeA::Rank() == TensorTypeC::Rank());
     static_assert(RANK >= 2);
@@ -162,10 +151,6 @@ public:
 
     // // Workspace buffer
     matxAlloc((void **)&workspace, workspaceSize, MATX_DEVICE_MEMORY);
-
-    if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
-      ConfigureCublasLt();
-    }
   }
 
   template <typename InputType>
@@ -227,92 +212,22 @@ public:
     // handle viewing it as an NxM. To accomplish this we use the identity C' =
     // B'A', so we swap A and B and permute them.
     if (c.Stride(RANK - 2) == 1 && c.Size(RANK - 1) != 1) {
-      if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
-        if (b.Stride(RANK - 2) == 1) {
-          params.opA = CUBLAS_OP_N;
-          params.a_rows = b.Size(RANK - 1);
-          params.a_cols = b.Size(RANK - 2);
-          params.lda = b.Stride(RANK - 1);
-        }
-        else if (b.Stride(RANK - 1) == 1) {
-          params.opA = CUBLAS_OP_T;
-          params.a_rows = b.Size(RANK - 2);
-          params.a_cols = b.Size(RANK - 1);
-          params.lda = b.Stride(RANK - 2);
-        }
-
-        if (a.Stride(RANK - 2) == 1) {
-          params.opB = CUBLAS_OP_N;
-          params.b_rows = a.Size(RANK - 1);
-          params.b_cols = a.Size(RANK - 2);
-          params.ldb = a.Stride(RANK - 1);
-        }
-        else if (a.Stride(RANK - 1) == 1) {
-          params.opB = CUBLAS_OP_T;
-          params.b_rows = a.Size(RANK - 2);
-          params.b_cols = a.Size(RANK - 1);
-          params.ldb = a.Stride(RANK - 2);
-        }
-
-        params.c_rows = params.a_rows;
-        params.c_cols = params.b_cols;
-        params.ldc = c.Stride(RANK - 1);
-      }
-      else if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
-        params.opA = CUBLAS_OP_N;
-        params.opB = CUBLAS_OP_N;
-        params.m = static_cast<int>(b.Size(RANK - 1));
-        params.n = static_cast<int>(a.Size(RANK - 2));
-        params.k =
-            static_cast<int>(a.Size(RANK - 2)); // Gemm Problem dimensions
-        params.lda = static_cast<int>(b.Stride(RANK - 1));
-        params.ldb = static_cast<int>(a.Stride(RANK - 1));
-        params.ldc = static_cast<int>(c.Stride(RANK - 1));
-      }      
+      params.m = static_cast<int>(b.Size(RANK - 1));
+      params.n = static_cast<int>(a.Size(RANK - 2));
+      params.k =
+          static_cast<int>(a.Size(RANK - 2)); // Gemm Problem dimensions
+      params.lda = static_cast<int>(b.Stride(RANK - 1));
+      params.ldb = static_cast<int>(a.Stride(RANK - 1));
+      params.ldc = static_cast<int>(c.Stride(RANK - 1));     
     }
     else {
-      if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
-        if (a.Stride(RANK - 1) == 1) {
-          params.opA = CUBLAS_OP_N;
-          params.a_rows = a.Size(RANK - 2);
-          params.a_cols = a.Size(RANK - 1);
-          params.lda = a.Stride(RANK - 2);
-        }
-        else if (a.Stride(RANK - 2) == 1) {
-          params.opA = CUBLAS_OP_T;
-          params.a_rows = a.Size(RANK - 1);
-          params.a_cols = a.Size(RANK - 2);
-          params.lda = a.Stride(RANK - 1);
-        }
-
-        if (b.Stride(RANK - 1) == 1) {
-          params.opB = CUBLAS_OP_N;
-          params.b_rows = b.Size(RANK - 2);
-          params.b_cols = b.Size(RANK - 1);
-          params.ldb = b.Stride(RANK - 2);
-        }
-        else if (b.Stride(RANK - 2) == 1) {
-          params.opB = CUBLAS_OP_T;
-          params.b_rows = b.Size(RANK - 1);
-          params.b_cols = b.Size(RANK - 2);
-          params.ldb = b.Stride(RANK - 1);
-        }
-
-        params.c_rows = params.a_rows;
-        params.c_cols = params.b_cols;
-        params.ldc = c.Stride(RANK - 2);
-      }
-      else if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
-        params.opA = CUBLAS_OP_N;
-        params.opB = CUBLAS_OP_N;
-        params.m = static_cast<int>(a.Size(RANK - 2));
-        params.n = static_cast<int>(b.Size(RANK - 1));
-        params.k =
-            static_cast<int>(a.Size(RANK - 1)); // Gemm Problem dimensions
-        params.lda = static_cast<int>(a.Stride(RANK - 2));
-        params.ldb = static_cast<int>(b.Stride(RANK - 2));
-        params.ldc = static_cast<int>(c.Stride(RANK - 2));
-      }
+      params.m = static_cast<int>(a.Size(RANK - 2));
+      params.n = static_cast<int>(b.Size(RANK - 1));
+      params.k =
+          static_cast<int>(a.Size(RANK - 1)); // Gemm Problem dimensions
+      params.lda = static_cast<int>(a.Stride(RANK - 2));
+      params.ldb = static_cast<int>(b.Stride(RANK - 2));
+      params.ldc = static_cast<int>(c.Stride(RANK - 2));
     }
 
     return params;
@@ -409,137 +324,6 @@ private:
   void *workspace = nullptr;
   detail::MatMulParams_t params_;
 
-  void ConfigureCublasLt()
-  {
-    ret = cublasLtCreate(&ltHandle);
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-
-    ret = cublasLtMatmulPreferenceCreate(&preference);
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-
-    ret = cublasLtMatmulDescCreate(
-                    &operationDesc, MatXTypeToCudaComputeType<T1>(),
-                    MatXTypeToCudaType<T1>());
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-
-    ret = cublasLtMatmulPreferenceSetAttribute(
-                    preference, CUBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
-                    &workspaceSize,
-                    sizeof(workspaceSize));
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-
-    cublasLtOrder_t rowOrder = CUBLASLT_ORDER_ROW;
-
-    // A operation
-    ret = cublasLtMatmulDescSetAttribute(
-                    operationDesc, CUBLASLT_MATMUL_DESC_TRANSA, &params_.opA,
-                    sizeof(params_.opA));
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-
-    // B operation
-    ret = cublasLtMatmulDescSetAttribute(
-                    operationDesc, CUBLASLT_MATMUL_DESC_TRANSB, &params_.opB,
-                    sizeof(params_.opB));
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-
-    // Update this later when we're more flexible on compute type
-    int32_t scaleType;
-    if constexpr (std::is_same_v<T1, float> || is_matx_half_v<T1>) {
-      scaleType = CUDA_R_32F;
-    }
-    else if constexpr (is_complex_half_v<T1> ||
-                       std::is_same_v<T1, cuda::std::complex<float>>) {
-      scaleType = CUDA_C_32F;
-    }
-    else if constexpr (std::is_same_v<T1, cuda::std::complex<double>>) {
-      scaleType = CUDA_C_64F;
-    }
-    else {
-      scaleType = CUDA_R_64F;
-    }
-
-    ret = cublasLtMatmulDescSetAttribute(
-                    operationDesc, CUBLASLT_MATMUL_DESC_SCALE_TYPE, &scaleType,
-                    sizeof(scaleType));
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-
-    // Matrix layouts
-    ret = cublasLtMatrixLayoutCreate(
-                    &Adesc, MatXTypeToCudaType<T2>(), params_.a_rows,
-                    params_.a_cols, params_.lda);
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-
-    ret =cublasLtMatrixLayoutCreate(
-                    &Bdesc, MatXTypeToCudaType<T3>(), params_.b_rows,
-                    params_.b_cols, params_.ldb);
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-
-    ret = cublasLtMatrixLayoutCreate(
-                    &Cdesc, MatXTypeToCudaType<T1>(), params_.c_rows,
-                    params_.c_cols, params_.ldc);
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-
-    // Matrix data order
-    ret = cublasLtMatrixLayoutSetAttribute(
-                    Adesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &rowOrder,
-                    sizeof(rowOrder));
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-
-    ret = cublasLtMatrixLayoutSetAttribute(
-                    Bdesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &rowOrder,
-                    sizeof(rowOrder));
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-
-    ret = cublasLtMatrixLayoutSetAttribute(
-                    Cdesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &rowOrder,
-                    sizeof(rowOrder));
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-
-    ret = cublasLtMatrixLayoutSetAttribute(
-                    Adesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &params_.batch,
-                    sizeof(params_.batch));
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-
-    ret = cublasLtMatrixLayoutSetAttribute(
-                    Bdesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &params_.batch,
-                    sizeof(params_.batch));
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-
-    ret = cublasLtMatrixLayoutSetAttribute(
-                    Cdesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &params_.batch,
-                    sizeof(params_.batch));
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-
-    if constexpr (is_complex_half_v<T1> && is_complex_half_v<T2>) {
-      size_t planarA = (params_.a_rows * params_.a_cols * sizeof(T1)) / 2;
-      size_t planarB = (params_.b_rows * params_.b_cols * sizeof(T1)) / 2;
-      size_t planarC = (params_.c_rows * params_.c_cols * sizeof(T1)) / 2;
-
-      ret = cublasLtMatrixLayoutSetAttribute(
-                      Adesc, CUBLASLT_MATRIX_LAYOUT_PLANE_OFFSET, &planarA,
-                      sizeof(planarA));
-      MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-
-      ret = cublasLtMatrixLayoutSetAttribute(
-                      Bdesc, CUBLASLT_MATRIX_LAYOUT_PLANE_OFFSET, &planarB,
-                      sizeof(planarB));
-      MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-
-      ret = cublasLtMatrixLayoutSetAttribute(
-                      Cdesc, CUBLASLT_MATRIX_LAYOUT_PLANE_OFFSET, &planarC,
-                      sizeof(planarC));
-      MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-    }
-
-    int res;
-    ret = cublasLtMatmulAlgoGetHeuristic(ltHandle, operationDesc, Adesc,
-                                               Bdesc, Cdesc, Cdesc, preference,
-                                               1, &heuristicResult,
-                                               &res);
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-    MATX_ASSERT(res > 0, matxMatMulError);
-  }
-
   // TODO: Fix the unused parameters once we support mixes of col/row on cublas
   template <MemOrder_t OrderA, MemOrder_t OrderB, MemOrder_t OrderC>
   inline void
@@ -549,12 +333,6 @@ private:
   {
 
     MATX_ASSERT_STR(PROV < PROVIDER_TYPE_SENTINEL, matxInvalidParameter, "Provider type out of range");
-    if constexpr ((PROV == PROVIDER_TYPE_CUTLASS) &&
-                  (is_complex_half_v<T1> || is_complex_half_v<T2>)) {
-      MATX_THROW(matxInvalidType,
-                 "CUTLASS does not support complex fp16/bf16 yet");
-    }
-
     if constexpr ((is_complex_half_v<T1> && !is_complex_half_v<T2>) ||
                   (is_complex_half_v<T2> && !is_complex_half_v<T3>) ||
                   (is_complex_half_v<T1> && !is_complex_half_v<T3>)) {
@@ -610,106 +388,47 @@ private:
       total_iter = std::accumulate(a_shape.begin(), a_shape.begin() + TensorTypeA::Rank() - 3, 1, std::multiplies<shape_type>());
     }
 
-    // For cuBLASLt most of the parameters have already been set in the
-    // configure stage
-    if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
-      MatMulScaleType_t salpha, sbeta;
-      memset(&salpha, 0, sizeof(salpha));
-      memset(&sbeta, 0, sizeof(sbeta));
-
-      if constexpr (std::is_same_v<T1, cuda::std::complex<float>> ||
-                    is_complex_half_v<T1>) {
-        salpha.cf32[0] = alpha;
-        sbeta.cf32[0] = beta;
-      }
-      else if constexpr (std::is_same_v<T1, cuda::std::complex<double>>) {
-        salpha.cf64[0] = alpha;
-        sbeta.cf64[0] = beta;
-      }
-      else if constexpr (std::is_same_v<T1, float> || is_matx_half_v<T1>) {
-        salpha.f32 = alpha;
-        sbeta.f32 = beta;
-      }
-      else if constexpr (std::is_same_v<T1, double>) {
-        salpha.f64 = alpha;
-        sbeta.f64 = beta;
-      }
-
-      if constexpr (RANK <= 3) {
-        auto res = cublasLtMatmul(
-            ltHandle, operationDesc, &salpha, (void *)a_adj.Data(), Adesc,
-            (void *)b_adj.Data(), Bdesc, &sbeta, (void *)c_adj.Data(), Cdesc,
-            (void *)c_adj.Data(), Cdesc, &heuristicResult.algo, workspace,
-            workspaceSize, stream);
-        MATX_ASSERT(res == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-      }
-      else {
-        for (size_t iter = 0; iter < total_iter; iter++) {
-          // Get pointers into A/B/C for this round
-          auto ap = std::apply([&a_adj](auto... param) { return a_adj.GetPointer(param...); }, idx);
-          auto bp = std::apply([&b_adj](auto... param) { return b_adj.GetPointer(param...); }, idx);
-          auto cp = std::apply([&c_adj](auto... param) { return c_adj.GetPointer(param...); }, idx);
-          auto res = cublasLtMatmul(
-                  ltHandle, operationDesc, &salpha, (void *)ap,
-                  Adesc, (void *)&bp, Bdesc, &sbeta,
-                  (void *)&cp, Cdesc, (void *)&cp,
-                  Cdesc, &heuristicResult.algo, workspace, workspaceSize,
-                  stream);
-          MATX_ASSERT(res == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-
-          // Update all but the last 2 indices
-          UpdateIndices<TensorTypeA, shape_type, TensorTypeA::Rank()>(a_adj, idx, 3);
-        }
-      }
-    }
 
     if constexpr (RANK == 2) {
-      if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
-#if MATX_ENABLE_CUTLASS
-        using CutlassAOrder = std::conditional_t<OrderA == MEM_ORDER_ROW_MAJOR,
-                                                 cutlass::layout::RowMajor,
-                                                 cutlass::layout::ColumnMajor>;
-        using CutlassBOrder = std::conditional_t<OrderB == MEM_ORDER_ROW_MAJOR,
-                                                 cutlass::layout::RowMajor,
-                                                 cutlass::layout::ColumnMajor>;
-        using CutlassCOrder = std::conditional_t<OrderC == MEM_ORDER_ROW_MAJOR,
-                                                 cutlass::layout::RowMajor,
-                                                 cutlass::layout::ColumnMajor>;
-        using CutlassGemm =
-            cutlass::gemm::device::Gemm<T1,             // Data-type of A matrix
-                                        CutlassAOrder,  // Layout of A matrix
-                                        T2,             // Data-type of B matrix
-                                        CutlassBOrder,  // Layout of B matrix
-                                        T3,             // Data-type of C matrix
-                                        CutlassCOrder>; // Layout of C matrix
+      using CutlassAOrder = std::conditional_t<OrderA == MEM_ORDER_ROW_MAJOR,
+                                                cutlass::layout::RowMajor,
+                                                cutlass::layout::ColumnMajor>;
+      using CutlassBOrder = std::conditional_t<OrderB == MEM_ORDER_ROW_MAJOR,
+                                                cutlass::layout::RowMajor,
+                                                cutlass::layout::ColumnMajor>;
+      using CutlassCOrder = std::conditional_t<OrderC == MEM_ORDER_ROW_MAJOR,
+                                                cutlass::layout::RowMajor,
+                                                cutlass::layout::ColumnMajor>;
+      using CutlassGemm =
+          cutlass::gemm::device::Gemm<T1,             // Data-type of A matrix
+                                      CutlassAOrder,  // Layout of A matrix
+                                      T2,             // Data-type of B matrix
+                                      CutlassBOrder,  // Layout of B matrix
+                                      T3,             // Data-type of C matrix
+                                      CutlassCOrder>; // Layout of C matrix
 
-        typename CutlassGemm::Arguments args(
-            {static_cast<int>(params_.m), static_cast<int>(params_.n),
-             static_cast<int>(params_.k)}, // Gemm Problem dimensions
-            {a.Data(),
-             static_cast<int>(params_.lda)}, // Tensor-ref for source matrix A
-            {b.Data(),
-             static_cast<int>(params_.ldb)}, // Tensor-ref for source matrix B
-            {c.Data(),
-             static_cast<int>(params_.ldc)}, // Tensor-ref for source matrix C
-            {c.Data(),
-             static_cast<int>(
-                 params_.ldc)}, // Tensor-ref for destination matrix D (may be
-                                // different memory than source C matrix)
-            {alpha, beta});     // Scalars used in the Epilogue
+      typename CutlassGemm::Arguments args(
+          {static_cast<int>(params_.m), static_cast<int>(params_.n),
+            static_cast<int>(params_.k)}, // Gemm Problem dimensions
+          {a.Data(),
+            static_cast<int>(params_.lda)}, // Tensor-ref for source matrix A
+          {b.Data(),
+            static_cast<int>(params_.ldb)}, // Tensor-ref for source matrix B
+          {c.Data(),
+            static_cast<int>(params_.ldc)}, // Tensor-ref for source matrix C
+          {c.Data(),
+            static_cast<int>(
+                params_.ldc)}, // Tensor-ref for destination matrix D (may be
+                              // different memory than source C matrix)
+          {alpha, beta});     // Scalars used in the Epilogue
 
-        CutlassGemm gemm_operator;
-        cutlass::Status status = gemm_operator(args, nullptr, stream);
+      CutlassGemm gemm_operator;
+      cutlass::Status status = gemm_operator(args, nullptr, stream);
 
-        MATX_ASSERT(status == cutlass::Status::kSuccess, matxMatMulError);
-#else
-        MATX_THROW(matxNotSupported, "CUTLASS not enabled!");
-#endif
-      }
+      MATX_ASSERT(status == cutlass::Status::kSuccess, matxMatMulError);
     }
     else {
       static_assert(RANK > 2);
-#if MATX_ENABLE_CUTLASS
       using CutlassAOrder = std::conditional_t<OrderA == MEM_ORDER_ROW_MAJOR,
                                                cutlass::layout::RowMajor,
                                                cutlass::layout::ColumnMajor>;
@@ -726,51 +445,46 @@ private:
           CutlassBOrder,  // Layout of B matrix
           T3,             // Data-type of C matrix
           CutlassCOrder>; // Layout of C matrix
-#endif
 
       if constexpr (RANK > 3) {
         if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
-#if MATX_ENABLE_CUTLASS
-        for (size_t iter = 0; iter < total_iter; iter++) {
-          // Get pointers into A/B/C for this round
-          auto ap = std::apply([&a_adj](auto... param) { return a_adj.GetPointer(param...); }, idx);
-          auto bp = std::apply([&b_adj](auto... param) { return b_adj.GetPointer(param...); }, idx);
-          auto cp = std::apply([&c_adj](auto... param) { return c_adj.GetPointer(param...); }, idx);
+          for (size_t iter = 0; iter < total_iter; iter++) {
+            // Get pointers into A/B/C for this round
+            auto ap = std::apply([&a_adj](auto... param) { return a_adj.GetPointer(param...); }, idx);
+            auto bp = std::apply([&b_adj](auto... param) { return b_adj.GetPointer(param...); }, idx);
+            auto cp = std::apply([&c_adj](auto... param) { return c_adj.GetPointer(param...); }, idx);
 
-          typename CutlassGemm::Arguments args(
-              {static_cast<int>(params_.m), static_cast<int>(params_.n),
-                static_cast<int>(params_.k)}, // Gemm Problem dimensions
-              {ap,
-                static_cast<int>(
-                    params_.lda)},     // Tensor-ref for source matrix A
-              a_adj.Stride(RANK - 3), // Batch Stride A
-              {bp,
-                static_cast<int>(
-                    params_.ldb)},     // Tensor-ref for source matrix B
-              b_adj.Stride(RANK - 3), // Batch Stride B
-              {cp,
-                static_cast<int>(
-                    params_.ldc)},     // Tensor-ref for source matrix C
-              c_adj.Stride(RANK - 3), // Batch Stride C
-              {cp,
-                static_cast<int>(
-                    params_.ldc)}, // Tensor-ref for destination matrix D (may
-                                  // be different memory than source C matrix)
-              c_adj.Stride(RANK - 3), // Batch Stride C
-              {alpha, beta},
-              params_.batch // Batch Dimension
-          );                // Scalars used in the Epilogue
+            typename CutlassGemm::Arguments args(
+                {static_cast<int>(params_.m), static_cast<int>(params_.n),
+                  static_cast<int>(params_.k)}, // Gemm Problem dimensions
+                {ap,
+                  static_cast<int>(
+                      params_.lda)},     // Tensor-ref for source matrix A
+                a_adj.Stride(RANK - 3), // Batch Stride A
+                {bp,
+                  static_cast<int>(
+                      params_.ldb)},     // Tensor-ref for source matrix B
+                b_adj.Stride(RANK - 3), // Batch Stride B
+                {cp,
+                  static_cast<int>(
+                      params_.ldc)},     // Tensor-ref for source matrix C
+                c_adj.Stride(RANK - 3), // Batch Stride C
+                {cp,
+                  static_cast<int>(
+                      params_.ldc)}, // Tensor-ref for destination matrix D (may
+                                    // be different memory than source C matrix)
+                c_adj.Stride(RANK - 3), // Batch Stride C
+                {alpha, beta},
+                params_.batch // Batch Dimension
+            );                // Scalars used in the Epilogue
 
-          CutlassGemm gemm_operator;
-          cutlass::Status status = gemm_operator(args, nullptr, stream);
-          MATX_ASSERT(status == cutlass::Status::kSuccess, matxMatMulError);
+            CutlassGemm gemm_operator;
+            cutlass::Status status = gemm_operator(args, nullptr, stream);
+            MATX_ASSERT(status == cutlass::Status::kSuccess, matxMatMulError);
 
-          // Update all but the last 2 indices
-          UpdateIndices<TensorTypeA, shape_type, TensorTypeA::Rank()>(a_adj, idx, 3);
-        }
-#else
-          MATX_THROW(matxNotSupported, "CUTLASS not enabled!");
-#endif
+            // Update all but the last 2 indices
+            UpdateIndices<TensorTypeA, shape_type, TensorTypeA::Rank()>(a_adj, idx, 3);
+          }
         }
         else {
           MATX_STATIC_ASSERT_STR(PROV < PROVIDER_TYPE_SENTINEL, matxInvalidParameter, "Invalid MatMul provider");
@@ -798,18 +512,10 @@ private:
                               float alpha, float beta)
   {
     if (c.Stride(RANK - 1) == 1) {
-      MatMulLaunch<OrderA, OrderB, MEM_ORDER_ROW_MAJOR>(a, b, c, stream, alpha,
-                                                        beta);
+      MatMulLaunch<OrderA, OrderB, MEM_ORDER_ROW_MAJOR>(a, b, c, stream, alpha, beta);
     }
     else if (c.Stride(RANK - 2) == 1) {
-      // Generate permutation
-      uint32_t perm[RANK];
-      std::iota(std::begin(perm), std::end(perm), 0);
-      std::swap(perm[RANK - 1], perm[RANK - 2]);
-
-      auto ct = c.Permute(perm);
-      MatMulDispatchC<OrderA, MEM_ORDER_COL_MAJOR>(a, b, ct, stream, alpha,
-                                                   beta);
+      MatMulLaunch<OrderA, OrderB, MEM_ORDER_COL_MAJOR>(a, b, c, stream, alpha, beta);
     }
     else {
       MATX_THROW(matxNotSupported,
@@ -828,13 +534,7 @@ private:
                                                    beta);
     }
     else if (b.Stride(RANK - 2) == 1) {
-      // Generate permutation
-      uint32_t perm[RANK];
-      std::iota(std::begin(perm), std::end(perm), 0);
-      std::swap(perm[RANK - 1], perm[RANK - 2]);
-
-      auto bt = b.Permute(perm);
-      MatMulDispatchC<OrderA, MEM_ORDER_COL_MAJOR>(a, bt, c, stream, alpha,
+      MatMulDispatchC<OrderA, MEM_ORDER_COL_MAJOR>(a, b, c, stream, alpha,
                                                    beta);
     }
     else {
@@ -852,13 +552,7 @@ private:
       MatMulDispatchB<MEM_ORDER_ROW_MAJOR>(a, b, c, stream, alpha, beta);
     }
     else if (a.Stride(RANK - 2) == 1) {
-      // Generate permutation
-      uint32_t perm[RANK];
-      std::iota(std::begin(perm), std::end(perm), 0);
-      std::swap(perm[RANK - 1], perm[RANK - 2]);
-
-      auto at = a.Permute(perm);
-      MatMulDispatchB<MEM_ORDER_COL_MAJOR>(at, b, c, stream, alpha, beta);
+      MatMulDispatchB<MEM_ORDER_COL_MAJOR>(a, b, c, stream, alpha, beta);
     }
     else {
       MATX_THROW(matxNotSupported,
@@ -891,13 +585,9 @@ struct MatMulParamsKeyEq {
   bool operator()(const MatMulParams_t &l, const MatMulParams_t &t) const
       noexcept
   {
-    return l.m == t.m && l.n == t.n && l.k == t.k && l.a_rows == t.a_rows &&
-           l.b_rows == t.b_rows && l.c_rows == t.c_rows &&
-           l.a_cols == t.a_cols && l.b_cols == t.b_cols &&
-           l.c_cols == t.c_cols && l.stream == t.stream && l.lda == t.lda &&
-           l.ldb == t.ldb && l.ldc == t.ldc && l.batch == t.batch &&
-           l.prov == t.prov && l.dtype == t.dtype && l.opA == t.opA &&
-           l.opB == t.opB;
+    return l.m == t.m && l.n == t.n && l.k == t.k && l.stream == t.stream && 
+           l.lda == t.lda && l.ldb == t.ldb && l.ldc == t.ldc && l.batch == t.batch &&
+           l.prov == t.prov && l.dtype == t.dtype;
   }
 };
 
@@ -940,7 +630,7 @@ static matxCache_t<MatMulParams_t, MatMulParamsKeyHash, MatMulParamsKeyEq>
  *   Scalar multiplier to apply to matrix C on input
  */
 template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB, 
-          MatXMatMulProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
+          MatXMatMulProvider_t PROV = PROVIDER_TYPE_CUTLASS>
 void matmul(TensorTypeC &c, const TensorTypeA &a,
             const TensorTypeB &b, cudaStream_t stream = 0,
             float alpha = 1.0, float beta = 0.0)

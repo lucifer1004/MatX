@@ -30,19 +30,25 @@
 # // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # /////////////////////////////////////////////////////////////////////////////////
 function(find_and_configure_cutlass VERSION)
+    # Strip off "real" from the arch list since CUTLASS doesn't take that
+    string(REPLACE "-real" "" CUTLASS_ARCH_LIST ${CMAKE_CUDA_ARCHITECTURES})
+    
+    # Workaround for CMP0126 in old CMake
+    set(CUTLASS_ENABLE_HEADERS_ONLY ON)
+    set(CUTLASS_NVCC_ARCHS ${CUTLASS_ARCH_LIST})
+
     CPMFindPackage(NAME cutlass
         GIT_REPOSITORY  https://github.com/NVIDIA/cutlass.git
-        GIT_TAG         a01feb9
         GIT_SHALLOW     TRUE
-        DOWNLOAD_ONLY
-        OPTIONS         "CUTLASS_ENABLE_TESTS OFF"
-                        "ENABLE_EXAMPLES OFF")
-       
+        GIT_TAG         v${VERSION}
+        OPTIONS         "CUTLASS_ENABLE_HEADERS_ONLY ON"
+                        "CUTLASS_NVCC_ARCHS ${CUTLASS_ARCH_LIST}")
+
     if(cutlass_ADDED)
-        set(cudf_ADDED TRUE PARENT_SCOPE)
         set(cutlass_SOURCE_DIR ${cutlass_SOURCE_DIR} PARENT_SCOPE)
+        set(cutlass_ADDED TRUE PARENT_SCOPE)
     endif()
 endfunction()
 
-set(CUDA_MATX_MIN_VERSION_cutlass "21.08.02")
+set(CUDA_MATX_MIN_VERSION_cutlass "2.8.0")
 find_and_configure_cutlass(${CUDA_MATX_MIN_VERSION_cutlass})

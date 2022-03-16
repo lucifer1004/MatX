@@ -83,7 +83,7 @@ TYPED_TEST(MatMulTestFloatTypes, SmallRect)
   this->pb->NumpyToTensorView(a, "a");
   this->pb->NumpyToTensorView(b, "b");
 
-  matmul<decltype(c), decltype(a), decltype(b), PROVIDER_TYPE_CUBLASLT>(c, a, b);
+  matmul(c, a, b);
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
 
   // matmul<TypeParam, TypeParam, TypeParam, 2, PROVIDER_TYPE_CUTLASS>(c, a,
@@ -114,7 +114,7 @@ TYPED_TEST(MatMulTestFloatTypes, SmallRectUserPointer)
   this->pb->NumpyToTensorView(a, "a");
   this->pb->NumpyToTensorView(b, "b");
 
-  matmul<decltype(c), decltype(a), decltype(b), PROVIDER_TYPE_CUBLASLT>(c, a, b);
+  matmul(c, a, b);
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
 
   cudaFree(ap);
@@ -145,7 +145,7 @@ TYPED_TEST(MatMulTestFloatTypes, DISABLED_SmallRectTranspose)
   this->pb->NumpyToTensorView(a, "a");
   this->pb->NumpyToTensorView(b, "b");
 
-  matmul<decltype(ct), decltype(bt), decltype(at), PROVIDER_TYPE_CUBLASLT>(ct, bt, at);
+  matmul(ct, bt, at);
 
   MATX_TEST_ASSERT_COMPARE(this->pb, ct, "c", 0.01);
   MATX_EXIT_HANDLER();
@@ -167,12 +167,10 @@ TYPED_TEST(MatMulTestFloatTypes, SmallSquare)
   this->pb->NumpyToTensorView(a, "a");
   this->pb->NumpyToTensorView(b, "b");
 
-  matmul<decltype(c), decltype(a), decltype(b), PROVIDER_TYPE_CUBLASLT>(c, a, b);
+  matmul(c, a, b);
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
 
-  // matmul<TypeParam, TypeParam, TypeParam, 2, PROVIDER_TYPE_CUTLASS>(c, a,
-  //                                                                    b);
-  // MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
+
   MATX_EXIT_HANDLER();
 }
 
@@ -192,7 +190,10 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRect)
   this->pb->NumpyToTensorView(a, "a");
   this->pb->NumpyToTensorView(b, "b");
 
-  matmul<decltype(c), decltype(a), decltype(b), PROVIDER_TYPE_CUBLASLT>(c, a, b);
+  matmul(c, a, b);
+  a.Print();
+  b.Print();
+  c.Print();
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
 
   // matmul<TypeParam, TypeParam, TypeParam, 2, PROVIDER_TYPE_CUTLASS>(c, a,

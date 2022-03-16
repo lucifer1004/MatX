@@ -15,7 +15,6 @@ option(MATX_BUILD_DOCS "Build documentation. Mutually exclusive with all other o
 option(MATX_BUILD_32_BIT "Build with 32-bit indexing support" OFF)
 option(MATX_MULTI_GPU "Multi-GPU support" OFF)
 option(MATX_EN_VISUALIZATION "Enable visualization support" OFF)
-option(MATX_EN_CUTLASS OFF)
 option(MATX_EN_CUTENSOR OFF)
 option(MATX_EN_FILEIO OFF)
 
@@ -131,15 +130,11 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         -Wnull-dereference)
 endif()
 
-# CUTLASS slows down compile times when used, so leave it as optional for now
-if (MATX_EN_CUTLASS)
-    include(cmake/GetCUTLASS.cmake)
-    set (CUTLASS_INC ${cutlass_SOURCE_DIR}/include/ ${cutlass_SOURCE_DIR}/tools/util/include/)
-    target_compile_definitions(matx INTERFACE MATX_ENABLE_CUTLASS=1)
-else()
-    set (CUTLASS_INC "")
-    target_compile_definitions(matx INTERFACE MATX_ENABLE_CUTLASS=0)
-endif()
+# CUTLASS for GEMMs
+include(cmake/GetCUTLASS.cmake)
+#target_link_libraries(matx INTERFACE nvidia::cutlass::cutlass)
+target_include_directories(matx SYSTEM INTERFACE "$<BUILD_INTERFACE:${cutlass_SOURCE_DIR}/include>")
+target_include_directories(matx SYSTEM INTERFACE "$<BUILD_INTERFACE:${cutlass_SOURCE_DIR}/tools/util/include>")
 
 # Get the tensor libraries if we need them
 if (MATX_EN_CUTENSOR)
@@ -242,8 +237,6 @@ if (NOT_SUBPROJECT)
         NAMESPACE matx::
         DOCUMENTATION doc_string)
 endif()
-
-
 
 if (MATX_BUILD_32_BIT)
     add_definitions(-DINDEX_32_BIT)

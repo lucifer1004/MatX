@@ -10,7 +10,7 @@ set(examples
     black_scholes)
 
 add_library(example_lib INTERFACE)
-target_include_directories(example_lib SYSTEM INTERFACE ${CUTLASS_INC} ${pybind11_INCLUDE_DIR} ${PYTHON_INCLUDE_DIRS}) 
+target_include_directories(example_lib SYSTEM INTERFACE ${pybind11_INCLUDE_DIR} ${PYTHON_INCLUDE_DIRS}) 
 target_include_directories( example_lib INTERFACE 
                             ${CMAKE_SOURCE_DIR}/include/ 
                             ${CMAKE_SOURCE_DIR}/include/kernels/ 

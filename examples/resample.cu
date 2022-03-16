@@ -34,6 +34,7 @@
 #include <cassert>
 #include <cstdio>
 #include <memory>
+#include <array>
 
 using namespace matx;
 #define FFT_TYPE CUFFT_C2C
@@ -57,6 +58,18 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaEvent_t start, stop;
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
+
+  bool *out;
+  randomGenerator_t<float> rfloat(10*10, 0);
+  std::array<index_t, 2> shape = {10,10};
+  auto in = make_tensor<float>(shape);
+  (in = rfloat.GetTensorView<2>({10, 10}, UNIFORM)).run();
+  in.Print();
+  cudaMalloc(&out, 100*sizeof(*out));
+  float threshold{0.75};
+  auto output_tensor = make_tensor<bool>(out, shape);
+  (output_tensor = in > threshold).run(stream);
+  output_tensor.Print();
 
   // Create data objects and views
   tensor_t<float, 1> sigView({num_samp});
