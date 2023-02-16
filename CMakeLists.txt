@@ -16,7 +16,7 @@ option(MATX_BUILD_DOCS "Build documentation. Mutually exclusive with all other o
 option(MATX_BUILD_32_BIT "Build with 32-bit indexing support" OFF)
 option(MATX_MULTI_GPU "Multi-GPU support" OFF)
 option(MATX_EN_VISUALIZATION "Enable visualization support" OFF)
-option(MATX_EN_CUTLASS OFF)
+option(MATX_EN_CUTLASS ON)
 option(MATX_EN_CUTENSOR OFF)
 option(MATX_EN_FILEIO OFF)
 
@@ -88,7 +88,9 @@ add_library(matx::matx ALIAS matx)
 target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
                                          "$<INSTALL_INTERFACE:include>")
 target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/kernels>"
-"$<INSTALL_INTERFACE:include/kernels>")                                         
+"$<INSTALL_INTERFACE:include/kernels>")
+target_include_directories(matx SYSTEM INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/public/cutlass/include>"
+"$<INSTALL_INTERFACE:public/cutlass/include>")                                     
 target_compile_features(matx INTERFACE cxx_std_17 $<BUILD_INTERFACE:cuda_std_17>)
 target_compile_options(matx INTERFACE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
 
@@ -130,16 +132,16 @@ endif()
 
 set(WARN_FLAGS ${WARN_FLAGS} $<$<COMPILE_LANGUAGE:CUDA>:-Werror all-warnings>)
 set(WARN_FLAGS ${WARN_FLAGS} $<$<COMPILE_LANGUAGE:CXX>:-Werror>)
-
+target_compile_definitions(matx INTERFACE MATX_ENABLE_CUTLASS=1)
 # CUTLASS slows down compile times when used, so leave it as optional for now
-if (MATX_EN_CUTLASS)
-    include(cmake/GetCUTLASS.cmake)
-    set (CUTLASS_INC ${cutlass_SOURCE_DIR}/include/ ${cutlass_SOURCE_DIR}/tools/util/include/)
-    target_compile_definitions(matx INTERFACE MATX_ENABLE_CUTLASS=1)
-else()
-    set (CUTLASS_INC "")
-    target_compile_definitions(matx INTERFACE MATX_ENABLE_CUTLASS=0)
-endif()
+# if (MATX_EN_CUTLASS)
+# #    include(cmake/GetCUTLASS.cmake)
+# #    set (CUTLASS_INC ${cutlass_SOURCE_DIR}/include/ ${cutlass_SOURCE_DIR}/tools/util/include/)
+#     target_compile_definitions(matx INTERFACE MATX_ENABLE_CUTLASS=1)
+# else()
+# #    set (CUTLASS_INC "")
+#     target_compile_definitions(matx INTERFACE MATX_ENABLE_CUTLASS=0)
+# endif()
 
 # Get the tensor libraries if we need them
 if (MATX_EN_CUTENSOR)

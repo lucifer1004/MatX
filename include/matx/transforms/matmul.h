@@ -32,6 +32,7 @@
 
 #pragma once
 
+#ifdef __CUDACC__ 
 #include <cublasLt.h>
 
 #if MATX_ENABLE_CUTLASS == 1
@@ -150,8 +151,8 @@ public:
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     
-    MATX_STATIC_ASSERT_STR((PROV != PROVIDER_TYPE_CUTLASS) || MATX_ENABLE_CUTLASS, matxMatMulError,
-                  "Must use -DCUTLASS_DIR in CMake to enable CUTLASS support");
+    // MATX_STATIC_ASSERT_STR((PROV != PROVIDER_TYPE_CUTLASS) || MATX_ENABLE_CUTLASS, matxMatMulError,
+    //               "Must use -DCUTLASS_DIR in CMake to enable CUTLASS support");
     static_assert(TensorTypeA::Rank() == TensorTypeB::Rank());
     static_assert(TensorTypeA::Rank() == TensorTypeC::Rank());
     static_assert(RANK >= 2);
@@ -1069,7 +1070,7 @@ __MATX_INLINE__ auto getCublasSupportedTensor( const Op &in, cudaStream_t stream
  *   Scalar multiplier to apply to operator C on input
  */
 template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB, 
-          MatXMatMulProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
+          MatXMatMulProvider_t PROV = PROVIDER_TYPE_CUTLASS>
 void matmul(TensorTypeC C, const TensorTypeA A,
             const TensorTypeB B, cudaStream_t stream = 0,
             float alpha = 1.0, float beta = 0.0)
@@ -1081,7 +1082,7 @@ void matmul(TensorTypeC C, const TensorTypeA A,
   if constexpr (is_c_complex) {
     constexpr auto is_a_complex = is_complex_v<typename TensorTypeA::scalar_type>;
     constexpr auto is_b_complex = is_complex_v<typename TensorTypeB::scalar_type>;
-    static_assert(is_a_complex || is_b_complex, "If C is complex then either A or B should be complex ");
+    static_assert(is_a_complex || is_b_complex, "If C is complex then either A or B should be complex");
   }
 
   // promote A and B to the type of C
@@ -1094,9 +1095,9 @@ void matmul(TensorTypeC C, const TensorTypeA A,
   auto a = getCublasSupportedTensor(A_, stream);
   auto b = getCublasSupportedTensor(B_, stream);
 
-  typedef decltype(c) ctype;
-  typedef decltype(a) atype;
-  typedef decltype(b) btype;
+  using ctype = decltype(c);
+  using atype = decltype(a);
+  using btype = decltype(b);
 
   if(!a.isSameView(A_)) {
     (a = A_).run(stream);
@@ -1255,3 +1256,5 @@ __MATX_INLINE__ void matvec(TensorTypeC C, const TensorTypeA A,
 }
 
 } // end namespace matx
+
+#endif

@@ -69,75 +69,97 @@ using namespace matx;
 int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
   MATX_ENTER_HANDLER();
-  using complex = cuda::std::complex<float>;
+  // using complex = cuda::std::complex<float>;
 
-  index_t signal_size = 1ULL << 16;
-  index_t filter_size = 16;
-  index_t batches = 8;
-  index_t filtered_size = signal_size + filter_size - 1;
+  // index_t signal_size = 1ULL << 16;
+  // index_t filter_size = 16;
+  // index_t batches = 8;
+  // index_t filtered_size = signal_size + filter_size - 1;
 
-  // Create time domain buffers
-  auto sig_time  = make_tensor<complex>({batches, signal_size});
-  auto filt_time = make_tensor<complex>({batches, filter_size});
-  auto time_out  = make_tensor<complex>({batches, filtered_size});
+  // // Create time domain buffers
+  // auto sig_time  = make_tensor<complex>({batches, signal_size});
+  // auto filt_time = make_tensor<complex>({batches, filter_size});
+  // auto time_out  = make_tensor<complex>({batches, filtered_size});
 
-  // Frequency domain buffers
-  auto sig_freq  = make_tensor<complex>({batches, filtered_size});
-  auto filt_freq = make_tensor<complex>({batches, filtered_size});
+  // // Frequency domain buffers
+  // auto sig_freq  = make_tensor<complex>({batches, filtered_size});
+  // auto filt_freq = make_tensor<complex>({batches, filtered_size});
 
-  for (index_t b = 0; b < batches; b++) {
-    // Fill the time domain signals with data
-    for (index_t i = 0; i < signal_size; i++) {
-      sig_time(b,i) = {-1.0f * (2.0f * static_cast<float>(i % 2) + 1.0f) *
-                            (static_cast<float>(i % 10) / 10.0f) +
-                        0.1f,
-                    -1.0f * (static_cast<float>(i % 2) == 0.0f) *
-                            (static_cast<float>(i % 10) / 5.0f) -
-                        0.1f};
-    }
-    for (index_t i = 0; i < filter_size; i++) {
-      filt_time(b,i) = {static_cast<float>(i) / static_cast<float>(filter_size),
-                      static_cast<float>(-i) / static_cast<float>(filter_size) +
-                          0.5f};
-    }
-  }
+  // for (index_t b = 0; b < batches; b++) {
+  //   // Fill the time domain signals with data
+  //   for (index_t i = 0; i < signal_size; i++) {
+  //     sig_time(b,i) = {-1.0f * (2.0f * static_cast<float>(i % 2) + 1.0f) *
+  //                           (static_cast<float>(i % 10) / 10.0f) +
+  //                       0.1f,
+  //                   -1.0f * (static_cast<float>(i % 2) == 0.0f) *
+  //                           (static_cast<float>(i % 10) / 5.0f) -
+  //                       0.1f};
+  //   }
+  //   for (index_t i = 0; i < filter_size; i++) {
+  //     filt_time(b,i) = {static_cast<float>(i) / static_cast<float>(filter_size),
+  //                     static_cast<float>(-i) / static_cast<float>(filter_size) +
+  //                         0.5f};
+  //   }
+  // }
 
-  // Prefetch the data we just created
-  sig_time.PrefetchDevice(0);
-  filt_time.PrefetchDevice(0);
+  // // Prefetch the data we just created
+  // sig_time.PrefetchDevice(0);
+  // filt_time.PrefetchDevice(0);
 
-  // Perform the FFT in-place on both signal and filter
-  fft(sig_freq, sig_time);
-  fft(filt_freq, filt_time);
+  // // Perform the FFT in-place on both signal and filter
+  // fft(sig_freq, sig_time);
+  // fft(filt_freq, filt_time);
 
-  // Perform the pointwise multiply. Overwrite signal buffer with result
-  (sig_freq = sig_freq * filt_freq).run();
+  // // Perform the pointwise multiply. Overwrite signal buffer with result
+  // (sig_freq = sig_freq * filt_freq).run();
 
-  // IFFT in-place
-  ifft(sig_freq, sig_freq);
+  // // IFFT in-place
+  // ifft(sig_freq, sig_freq);
 
-  // Now the sig_freq view contains the full convolution result. Verify against
-  // a direct convolution. The conv1d function only accepts a 1D filter, so we
-  // create a sliced view here.
-  auto filt1 = filt_time.Slice<1>({0,0}, {matxDropDim, matxEnd});
-  conv1d(time_out, sig_time, filt1, matxConvCorrMode_t::MATX_C_MODE_FULL,
-          0);
+  // // Now the sig_freq view contains the full convolution result. Verify against
+  // // a direct convolution. The conv1d function only accepts a 1D filter, so we
+  // // create a sliced view here.
+  // auto filt1 = filt_time.Slice<1>({0,0}, {matxDropDim, matxEnd});
+  // conv1d(time_out, sig_time, filt1, matxConvCorrMode_t::MATX_C_MODE_FULL,
+  //         0);
 
-  cudaStreamSynchronize(0);
+  // cudaStreamSynchronize(0);
  
-  // Compare signals
-  for (index_t b = 0; b < batches; b++) {
-    for (index_t i = 0; i < filtered_size; i++) {
-      if (fabs(time_out(b,i).real() - sig_freq(b,i).real()) > 0.001 ||
-          fabs(time_out(b,i).imag() - sig_freq(b,i).imag()) > 0.001) {
-        std::cout <<
-            "Verification failed at item " << i << ". Direct=" << time_out(b,i).real() << " " << time_out(b,i).imag() << ", FFT=" <<
-            sig_freq(b,i).real() << " " <<
-            sig_freq(b,i).imag() << "\n";
-        return -1;
-      }
-    }
-  }
+  // // Compare signals
+  // for (index_t b = 0; b < batches; b++) {
+  //   for (index_t i = 0; i < filtered_size; i++) {
+  //     if (fabs(time_out(b,i).real() - sig_freq(b,i).real()) > 0.001 ||
+  //         fabs(time_out(b,i).imag() - sig_freq(b,i).imag()) > 0.001) {
+  //       std::cout <<
+  //           "Verification failed at item " << i << ". Direct=" << time_out(b,i).real() << " " << time_out(b,i).imag() << ", FFT=" <<
+  //           sig_freq(b,i).real() << " " <<
+  //           sig_freq(b,i).imag() << "\n";
+  //       return -1;
+  //     }
+  //   }
+  // }
+  
+  using TypeParam=float;
+  auto pb = std::make_unique<detail::MatXPybind>();
+  constexpr index_t m = 4;
+  constexpr index_t k = 8;
+  constexpr index_t n = 16;  
+  pb->template InitAndRunTVGenerator<TypeParam>(
+      "00_transforms", "matmul_operators", "run_a_transpose", {m, k, n});
+
+
+
+  tensor_t<TypeParam, 2> a{{k, m}};
+  tensor_t<TypeParam, 2> b{{k, n}};
+  tensor_t<TypeParam, 2> c{{m, n}};
+  pb->NumpyToTensorView(a, "a");
+  pb->NumpyToTensorView(b, "b");  
+  auto at = a.PermuteMatrix();
+  matmul(c, at, b);
+  Print(b);
+  Print(at);
+  Print(c);
+  
 
   std::cout << "Verification successful" << std::endl;
 
