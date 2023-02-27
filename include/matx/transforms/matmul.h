@@ -298,61 +298,66 @@ public:
       }      
     }
     else {
-      if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
-        if constexpr (is_complex_half_v<typename TensorTypeA::scalar_type>) {
-          // For half complex we always copy to a new tensor so it is always cublas op N
-          params.opA = CUBLAS_OP_N;
-        } else if ( a.Stride(RANK-1) > 1 // last stride > 1
-                  || (a.Stride(RANK-1) == 1 && a.Stride(RANK-2) == 1 && a.Size(RANK-1) != 1)) { // last strides both equal 1 and size > 1 
-          params.opA = CUBLAS_OP_T;
-        } else { // otherwise row major
-          params.opA = CUBLAS_OP_N;
-        }
+      if constexpr (is_complex_half_v<typename TensorTypeA::scalar_type>) {
+        // For half complex we always copy to a new tensor so it is always cublas op N
+        params.opA = CUBLAS_OP_N;
+      } else if ( a.Stride(RANK-1) > 1 // last stride > 1
+                || (a.Stride(RANK-1) == 1 && a.Stride(RANK-2) == 1 && a.Size(RANK-1) != 1)) { // last strides both equal 1 and size > 1 
+        params.opA = CUBLAS_OP_T;
+      } else { // otherwise row major
+        params.opA = CUBLAS_OP_N;
+      }
 
-        if constexpr (is_complex_half_v<typename TensorTypeB::scalar_type>) {
-          // For half complex we always copy to a new tensor so it is always cublas op N
-          params.opB = CUBLAS_OP_N;
-        } else if ( b.Stride(RANK-1) > 1 // last stride > 1
-                  || (b.Stride(RANK-1) == 1 && b.Stride(RANK-2) == 1 && b.Size(RANK-1) != 1)) { // last strides both equal 1 and size > 1 
-          params.opB = CUBLAS_OP_T;
-        } else { // otherwise row major
-          params.opB = CUBLAS_OP_N;
-        }
+      if constexpr (is_complex_half_v<typename TensorTypeB::scalar_type>) {
+        // For half complex we always copy to a new tensor so it is always cublas op N
+        params.opB = CUBLAS_OP_N;
+      } else if ( b.Stride(RANK-1) > 1 // last stride > 1
+                || (b.Stride(RANK-1) == 1 && b.Stride(RANK-2) == 1 && b.Size(RANK-1) != 1)) { // last strides both equal 1 and size > 1 
+        params.opB = CUBLAS_OP_T;
+      } else { // otherwise row major
+        params.opB = CUBLAS_OP_N;
+      }
+
+      // set lda/ldb according to transpose modes
+      params.ldb = (params.opB == CUBLAS_OP_T) ? b.Stride(RANK - 1) : b.Stride(RANK - 2); 
+      params.lda = (params.opA == CUBLAS_OP_T) ? a.Stride(RANK - 1) : a.Stride(RANK - 2);
+
+      // for complex half we have copied to planar row-major
+      if (is_complex_half_v<typename TensorTypeB::scalar_type>) {
+        params.ldb = b.Size(RANK-1);
+      }
+
+      // for complex half we have copied to planar row-major
+      if constexpr (is_complex_half_v<typename TensorTypeB::scalar_type>) {
+        params.lda = a.Size(RANK-1);
+      }
+
+      params.ldc = c.Stride(RANK - 2);
+
+      if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
+
         
         params.a_rows = a.Size(RANK - 2);
         params.a_cols = a.Size(RANK - 1);
         params.b_rows = b.Size(RANK - 2);
         params.b_cols = b.Size(RANK - 1);
-       
-        // set lda/ldb according to transpose modes
-        params.ldb = (params.opB == CUBLAS_OP_T) ? b.Stride(RANK - 1) : b.Stride(RANK - 2); 
-        params.lda = (params.opA == CUBLAS_OP_T) ? a.Stride(RANK - 1) : a.Stride(RANK - 2);
-
-        // for complex half we have copied to planar row-major
-        if (is_complex_half_v<typename TensorTypeB::scalar_type>) {
-          params.ldb = b.Size(RANK-1);
-        }
-
-        // for complex half we have copied to planar row-major
-        if constexpr (is_complex_half_v<typename TensorTypeB::scalar_type>) {
-          params.lda = a.Size(RANK-1);
-        }
+      
 
         params.c_rows = params.a_rows;
         params.c_cols = params.b_cols;
-        params.ldc = c.Stride(RANK - 2);
+        
        
       }
       else if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
-        params.opA = CUBLAS_OP_N;
-        params.opB = CUBLAS_OP_N;
+        //params.opA = CUBLAS_OP_N;
+        //params.opB = CUBLAS_OP_N;
         params.m = static_cast<int>(a.Size(RANK - 2));
         params.n = static_cast<int>(b.Size(RANK - 1));
         params.k =
             static_cast<int>(a.Size(RANK - 1)); // Gemm Problem dimensions
-        params.lda = static_cast<int>(a.Stride(RANK - 2));
-        params.ldb = static_cast<int>(b.Stride(RANK - 2));
-        params.ldc = static_cast<int>(c.Stride(RANK - 2));
+        // params.lda = static_cast<int>(a.Stride(RANK - 2));
+        // params.ldb = static_cast<int>(b.Stride(RANK - 2));
+        // params.ldc = static_cast<int>(c.Stride(RANK - 2));
       }
     }
 
@@ -778,6 +783,7 @@ private:
     if constexpr (RANK == 2) {
       if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
 #if MATX_ENABLE_CUTLASS
+printf("here\n");
         using CutlassAOrder = std::conditional_t<OrderA == MEM_ORDER_ROW_MAJOR,
                                                  cutlass::layout::RowMajor,
                                                  cutlass::layout::ColumnMajor>;
@@ -794,7 +800,10 @@ private:
                                         CutlassBOrder,  // Layout of B matrix
                                         T3,             // Data-type of C matrix
                                         CutlassCOrder>; // Layout of C matrix
-
+printf("%d %d %d %d %d %d %d %d %d\n", std::is_same_v<CutlassAOrder,cutlass::layout::RowMajor>,
+std::is_same_v<CutlassBOrder,cutlass::layout::RowMajor>,std::is_same_v<CutlassCOrder,cutlass::layout::RowMajor>,
+static_cast<int>(params_.m), static_cast<int>(params_.n),
+             static_cast<int>(params_.k), static_cast<int>(params_.lda), static_cast<int>(params_.ldb), static_cast<int>(params_.ldc));
         typename CutlassGemm::Arguments args(
             {static_cast<int>(params_.m), static_cast<int>(params_.n),
              static_cast<int>(params_.k)}, // Gemm Problem dimensions
@@ -1178,7 +1187,7 @@ void matmul(TensorTypeC C, const TensorTypeA A,
  *   Scalar multiplier to apply to operator C on input
  */
 template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB, 
-          MatXMatMulProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
+          MatXMatMulProvider_t PROV = PROVIDER_TYPE_CUTLASS>
 __MATX_INLINE__ void matmul(TensorTypeC C, const TensorTypeA A,
             const TensorTypeB B, const int32_t (&axis)[2],
             cudaStream_t stream = 0,
@@ -1230,7 +1239,7 @@ __MATX_INLINE__ void matmul(TensorTypeC C, const TensorTypeA A,
  *   Scalar multiplier to apply to operator C on input
  */
 template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB, 
-          MatXMatMulProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
+          MatXMatMulProvider_t PROV = PROVIDER_TYPE_CUTLASS>
 __MATX_INLINE__ void matvec(TensorTypeC C, const TensorTypeA A,
             const TensorTypeB B,
             cudaStream_t stream = 0,

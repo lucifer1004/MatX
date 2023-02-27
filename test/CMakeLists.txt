@@ -12,7 +12,6 @@ set (test_sources
     00_operators/GeneratorTests.cu
     00_operators/ReductionTests.cu
     00_transform/ConvCorr.cu
-    00_transform/MatMul.cu
     00_transform/Cov.cu
     00_transform/FFT.cu
     00_transform/Solve.cu
@@ -30,6 +29,23 @@ set (test_sources
     01_radar/MVDRBeamformer.cu
     01_radar/ambgfun.cu
     01_radar/dct.cu
+
+    00_transform/matmul/small_rect/float.cu
+    00_transform/matmul/small_rect/double.cu
+    00_transform/matmul/small_rect/fp16.cu
+    00_transform/matmul/small_rect/bf16.cu
+    00_transform/matmul/small_rect/complex_float.cu
+    00_transform/matmul/small_rect/complex_double.cu    
+    00_transform/matmul/small_rect/complex_fp16.cu
+    00_transform/matmul/small_rect/complex_bf16.cu
+    00_transform/matmul/small_rect_a_transpose/float.cu
+    00_transform/matmul/small_rect_a_transpose/double.cu
+    00_transform/matmul/small_rect_a_transpose/fp16.cu
+    00_transform/matmul/small_rect_a_transpose/bf16.cu
+    00_transform/matmul/small_rect_a_transpose/complex_float.cu
+    00_transform/matmul/small_rect_a_transpose/complex_double.cu    
+    00_transform/matmul/small_rect_a_transpose/complex_fp16.cu
+    00_transform/matmul/small_rect_a_transpose/complex_bf16.cu        
     main.cu
 )
 
