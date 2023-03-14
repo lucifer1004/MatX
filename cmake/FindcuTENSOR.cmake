@@ -79,7 +79,7 @@ else()
 endif()
 
 if(NOT cuTENSOR_FOUND)
-  set(CUTENSOR_VERSION 1.5.0.3)
+  set(CUTENSOR_VERSION 1.6.2.3)
   set(CUTENSOR_FILENAME libcutensor-linux-x86_64-${CUTENSOR_VERSION}-archive)
 
   message(STATUS "cuTENSOR not found. Downloading library. By continuing this download you accept to the license terms of cuTENSOR")
@@ -91,8 +91,14 @@ if(NOT cuTENSOR_FOUND)
     # Eigen's CMakelists are not intended for library use
     DOWNLOAD_ONLY YES 
   )
-      
-  set(cuTENSOR_LIBRARY ${cutensor_SOURCE_DIR}/lib/11/libcutensor.so)
+  
+  if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL "12.0.0")
+    set(cuTENSOR_LIBRARY ${cutensor_SOURCE_DIR}/lib/12/libcutensor.so)
+  else()
+    set(cuTENSOR_LIBRARY ${cutensor_SOURCE_DIR}/lib/11/libcutensor.so)
+  endif()      
+  
+  
   set(cuTENSOR_INCLUDE_DIR ${cutensor_SOURCE_DIR}/include) 
 
 

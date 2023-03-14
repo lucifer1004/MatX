@@ -174,7 +174,7 @@ public:
     MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError, "Failed to create cuTENSOR workspace descriptor");  
 
     uint64_t requiredWorkspaceSize = 0;
-    status = cutensornetWorkspaceComputeSizes(handle_,
+    status = cutensornetWorkspaceComputeContractionSizes(handle_,
                                           descNet_,
                                           optimizerInfo,
                                           workDesc_);
