@@ -92,6 +92,8 @@ public:
     int64_t *extents[sizeof...(InT) + 1];
     int64_t *strides[sizeof...(InT) + 1];
     void *data_in[sizeof...(InT)];
+    cutensornetTensorQualifiers_t qualifersIn[sizeof...(InT)]; //defaults to false
+    
     for (i = 0; i < sizeof...(InT) + 1; i++) {
       modes[i] = params_.modes_[i].data();
       extents[i] = params_.extents_[i].data();
@@ -112,12 +114,11 @@ public:
                                                 extents, 
                                                 strides, 
                                                 modes, 
-                                                params_.alignments_in_,
+                                                qualifersIn,
                                                 out.Rank(), 
                                                 extents[sizeof...(InT)], 
                                                 strides[sizeof...(InT)], 
                                                 modes[sizeof...(InT)], 
-                                                params_.alignment_out_,
                                                 MatXTypeToCudaType<typename OutputTensor::scalar_type>(), 
                                                 CUTENSORNET_COMPUTE_32F,
                                                 &descNet_);
@@ -175,9 +176,9 @@ public:
 
     uint64_t requiredWorkspaceSize = 0;
     status = cutensornetWorkspaceComputeContractionSizes(handle_,
-                                          descNet_,
-                                          optimizerInfo,
-                                          workDesc_);
+                                                         descNet_,
+                                                         optimizerInfo,
+                                                         workDesc_);
     MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError,
         "Failed to compute cuTENSOR workspace size");  
 
@@ -377,18 +378,26 @@ public:
     size_t i = 0;
     ((data_in[i++] = tensors.Data()), ...);
 
-    for (int64_t slice = 0; slice < params_.num_slices_; slice++)
-    {
-      auto status = cutensornetContraction(handle_,
-                                plan_,
-                                data_in,
-                                out.Data(),
-                                workDesc_, 
-                                slice, 
-                                stream);
-      MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS,
-        matxcuTensorError, "cutensornetContraction failed");
-    }
+    cutensornetSliceGroup_t sliceGroup;
+    cutensornetCreateSliceGroupFromIDRange(
+                                          handle_,
+                                          0,
+                                          params_.num_slices_,
+                                          1,
+                                          &sliceGroup
+                                          );
+                                          
+    auto status = cutensornetContractSlices(handle_,
+                                            plan_,
+                                            data_in,
+                                            out.Data(),
+                                            0, // accum buffer not being used
+                                            workDesc_, 
+                                            sliceGroup, 
+                                            stream);
+                                            
+    MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS,
+      matxcuTensorError, "cutensornetContraction failed");
   }    
 
   private:
