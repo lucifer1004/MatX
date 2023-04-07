@@ -79,6 +79,8 @@ using remove_cvref_t = typename remove_cvref<T>::type;
 template <typename T, int RANK, typename Desc> class tensor_impl_t;
 template <typename T, int RANK, typename Storage, typename Desc> class tensor_t;
 
+
+
 namespace detail {
 template <typename T, typename = void>
 struct is_matx_op_impl : std::false_type {
@@ -136,6 +138,38 @@ struct is_tensor_view<T, std::void_t<typename T::tensor_view>>
  */
 template< class T >
 inline constexpr bool is_tensor_view_v = detail::is_tensor_view<typename remove_cvref<T>::type>::value;
+
+namespace detail {
+template <typename T, typename = void>
+struct is_hermitian_op : std::false_type {};
+template <typename T>
+struct is_hermitian_op<T, std::void_t<typename T::hermitian_op>> : std::true_type {
+};
+}
+
+template <typename T> 
+inline constexpr bool is_hermitian_op_v = detail::is_hermitian_op<typename remove_cvref<T>::type>::value;
+
+template <typename T, typename = void> 
+struct inner_op {
+  using type = std::false_type;
+};
+
+template <typename T> 
+struct inner_op<T, typename std::enable_if_t<is_hermitian_op_v<T>>> {
+  using type = typename T::inner_op;
+};
+
+/**
+ * @brief Determine if a type is a hermitian tensor
+ * 
+ * @tparam T Type to test
+ */
+template <typename T> 
+inline constexpr bool is_hermitian_tensor_v = is_tensor_view_v<typename inner_op<remove_cvref_t<T>>::type>;
+//inline constexpr bool is_hermitian_tensor_v = std::conjunction_v<typename detail::is_hermitian_op<T>, typename detail::is_tensor_view<typename remove_cvref_t<T>::inner_op>>;
+
+
 
 namespace detail {
 template <typename T> struct is_executor : std::false_type {};

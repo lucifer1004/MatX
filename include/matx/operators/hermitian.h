@@ -53,9 +53,11 @@ namespace matx
 
       public:
         using matxop = bool;
+        using hermitian_op = bool;
+        using inner_op = T1;
         using scalar_type = typename T1::scalar_type;
 
-	__MATX_INLINE__ std::string str() const { return "hermitian(" + op_.str() + ")"; }
+	      __MATX_INLINE__ std::string str() const { return "hermitian(" + op_.str() + ")"; }
         __MATX_INLINE__ HermitianTransOp(T1 op) : op_(op) {
           static_assert(Rank() >= 2, "Hermitian operation needs input with rank >= 2");
         }
@@ -79,6 +81,8 @@ namespace matx
           // Optimize these branches later
           return (dim < (Rank() - 2)) ? op_.Size(dim) : op_.Size((dim == Rank() - 1) ? Rank() - 2 : Rank() - 1);
         }
+
+        auto GetOp() { return op_; }
     };
   }
 
