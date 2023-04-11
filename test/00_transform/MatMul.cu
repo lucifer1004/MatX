@@ -70,9 +70,14 @@ template <typename TensorType>
 class MatMulTestFloatNonComplexTypes : public MatMulTest<TensorType> {
 };
 
+template <typename TensorType>
+class MatMulTestComplexTypes : public MatMulTest<TensorType> {
+};
+
 TYPED_TEST_SUITE(MatMulTestFloatTypes, MatXFloatTypes);
 TYPED_TEST_SUITE(MatMulTestFloatNonHalfTypes, MatXFloatNonHalfTypes);
 TYPED_TEST_SUITE(MatMulTestFloatNonComplexTypes, MatXFloatNonComplexTypes);
+TYPED_TEST_SUITE(MatMulTestComplexTypes, MatXComplexTypes);
 
 template <typename T>
 struct float_to_complex
@@ -136,6 +141,28 @@ TYPED_TEST(MatMulTestFloatTypes, SmallRectATranspose)
   auto at = a.PermuteMatrix();
   matmul(c, at, b);
   MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(MatMulTestComplexTypes, SmallRectAHermitian)
+{
+  MATX_ENTER_HANDLER();
+  constexpr index_t m = 4;
+  constexpr index_t k = 8;
+  constexpr index_t n = 16;
+  tensor_t<TypeParam, 2> a{{k, m}};
+  tensor_t<TypeParam, 2> b{{k, n}};
+  tensor_t<TypeParam, 2> c{{m, n}};
+
+  this->pb->template InitAndRunTVGenerator<TypeParam>(
+      "00_transforms", "matmul_operators", "run_a_transpose", {m, k, n});
+
+  this->pb->NumpyToTensorView(a, "a");
+  this->pb->NumpyToTensorView(b, "b");
+
+  matmul(c, hermitianT(a), b);
+  MATX_TEST_ASSERT_COMPARE(this->pb, c, "ch", this->thresh);
 
   MATX_EXIT_HANDLER();
 }

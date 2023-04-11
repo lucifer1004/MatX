@@ -82,7 +82,7 @@ namespace matx
           return (dim < (Rank() - 2)) ? op_.Size(dim) : op_.Size((dim == Rank() - 1) ? Rank() - 2 : Rank() - 1);
         }
 
-        auto GetOp() { return op_; }
+        auto GetOp() const { return op_; }
     };
   }
 

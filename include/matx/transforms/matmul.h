@@ -301,36 +301,61 @@ public:
         if constexpr (is_complex_half_v<typename TensorTypeA::scalar_type>) {
           // For half complex we always copy to a new tensor so it is always cublas op N
           params.opA = CUBLAS_OP_N;
+          params.a_rows = a.Size(RANK - 2);
+          params.a_cols = a.Size(RANK - 1); 
+          params.lda    = a.Stride(RANK - 2); 
+          params.c_rows = params.a_rows;        
         } else if (a_herm) {
           params.opA = CUBLAS_OP_C;
+          params.a_rows = a.Size(RANK - 1);
+          params.a_cols = a.Size(RANK - 2);  
+          params.lda    = a.Size(RANK - 2);  
+          params.c_rows = params.a_cols;            
         }
         else if ( a.Stride(RANK-1) > 1 // last stride > 1
                   || (a.Stride(RANK-1) == 1 && a.Stride(RANK-2) == 1 && a.Size(RANK-1) != 1)) { // last strides both equal 1 and size > 1 
           params.opA = CUBLAS_OP_T;
+          params.a_rows = a.Size(RANK - 1);
+          params.a_cols = a.Size(RANK - 2); 
+          params.lda    = a.Size(RANK - 2);    
+          params.c_rows = params.a_cols;         
         } else { // otherwise row major
           params.opA = CUBLAS_OP_N;
+          params.a_rows = a.Size(RANK - 2);
+          params.a_cols = a.Size(RANK - 1); 
+          params.lda    = a.Stride(RANK - 2); 
+          params.c_rows = params.a_rows;              
         }
 
         if constexpr (is_complex_half_v<typename TensorTypeB::scalar_type>) {
           // For half complex we always copy to a new tensor so it is always cublas op N
           params.opB = CUBLAS_OP_N;
+          params.b_rows = b.Size(RANK - 2);
+          params.b_cols = b.Size(RANK - 1);  
+          params.ldb = b.Stride(RANK - 2);    
+          params.c_cols = params.b_cols;     
         } else if (b_herm) {
           params.opB = CUBLAS_OP_C;
+          params.b_rows = b.Size(RANK - 1);
+          params.b_cols = b.Size(RANK - 2);
+          params.ldb = b.Stride(RANK - 1); 
+          params.c_cols = params.b_rows;          
         } else if ( b.Stride(RANK-1) > 1 // last stride > 1
                   || (b.Stride(RANK-1) == 1 && b.Stride(RANK-2) == 1 && b.Size(RANK-1) != 1)) { // last strides both equal 1 and size > 1 
+          params.b_rows = b.Size(RANK - 1);
+          params.b_cols = b.Size(RANK - 2);                   
           params.opB = CUBLAS_OP_T;
+          params.ldb = b.Stride(RANK - 1); 
+          params.c_cols = params.b_rows;
         } else { // otherwise row major
+          params.b_rows = b.Size(RANK - 2);
+          params.b_cols = b.Size(RANK - 1);           
           params.opB = CUBLAS_OP_N;
+          params.ldb = b.Stride(RANK - 2); 
+          params.c_cols = params.b_cols;
         }
         
-        params.a_rows = a.Size(RANK - 2);
-        params.a_cols = a.Size(RANK - 1);
-        params.b_rows = b.Size(RANK - 2);
-        params.b_cols = b.Size(RANK - 1);
-       
-        // set lda/ldb according to transpose modes
-        params.ldb = b.Stride(RANK - 2); 
-        params.lda =  a.Stride(RANK - 2);
+        params.ldc = c.Stride(RANK - 2);        
 
         // for complex half we have copied to planar row-major
         if (is_complex_half_v<typename TensorTypeB::scalar_type>) {
@@ -342,9 +367,6 @@ public:
           params.lda = a.Size(RANK-1);
         }
 
-        params.c_rows = params.a_rows;
-        params.c_cols = params.b_cols;
-        params.ldc = c.Stride(RANK - 2);
        
       }
       else if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
@@ -1025,7 +1047,7 @@ __MATX_INLINE__ auto getCublasSupportedTensor( const Op &in, cudaStream_t stream
       return std::tuple{make_tensor<typename Op::scalar_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream), false};
     }
     
-    return std::tuple{h_tensor, true};
+    return std::tuple{h_tensor.PermuteMatrixImpl(), true};
   }
   else if constexpr ( !(is_tensor_view_v<Op>)) {
     return std::tuple{make_tensor<typename Op::scalar_type>(in.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream), false};

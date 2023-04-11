@@ -78,6 +78,10 @@ class matmul_operators:
         self.res['a'] = matx_common.randn_ndarray((self.size[1], self.size[0]), self.dtype)
         self.res['c'] = np.transpose(self.res['a']) @ self.res['b']
         return self.res
+    def run_a_hermitian(self) -> Dict[str, np.ndarray]:
+        self.res['a'] = matx_common.randn_ndarray((self.size[1], self.size[0]), self.dtype)
+        self.res['ch'] = np.conj(self.res['a']).T @ self.res['b']
+        return self.res    
     def run_b_transpose(self) -> Dict[str, np.ndarray]:
         self.res['b'] = matx_common.randn_ndarray((self.size[2], self.size[1]), self.dtype)
         self.res['c'] = self.res['a'] @ np.transpose(self.res['b'])

@@ -76,6 +76,7 @@ class tensor_impl_t {
     using desc_type = Desc;
     using shape_type = typename Desc::shape_type;
     using stride_type = typename Desc::stride_type;
+    using self_type = tensor_impl_t<T, RANK, Desc>;
 
     // Type specifier for signaling this is a matx operation
     using matxop = bool;
@@ -808,6 +809,19 @@ class tensor_impl_t {
       return desc_.Size(Rank() - 1);
     }
 
+    /**
+     * Get the size of the last dimension
+     *
+     * @return
+     *    The size of the dimension
+     */
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto PermuteMatrix() const noexcept
+    {
+      auto shape = this->desc_.Shape();
+      std::swap(shape[RANK-1], shape(RANK-2));
+    }
+
+
     __MATX_INLINE__ __MATX_HOST__  auto Bytes() const noexcept
     {
       return TotalSize() * sizeof(*ldata_);
@@ -821,6 +835,96 @@ class tensor_impl_t {
     auto Data() const noexcept {
       return ldata_;
     } 
+
+
+  /**
+   * Permute the dimensions of a tensor
+   *
+   * Accepts any order of permutation. Number of dimensions must match RANK of
+   * tensor
+   *
+   * @tparam M
+   *   Rank of tensor to permute. Should not be used directly
+   *
+   * @param dims
+   *   Dimensions of tensor
+   *
+   * @returns tensor view of only imaginary-valued components
+   *
+   */
+  __MATX_INLINE__ auto PermuteImpl(const std::array<int32_t, RANK> &dims) const
+  {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+    
+    static_assert(RANK >= 2, "Only tensors of rank 2 and higher can be permuted.");
+    std::array<shape_type, RANK> n;
+    std::array<stride_type, RANK> s;
+    [[maybe_unused]] bool done[RANK] = {0};
+
+#pragma unroll
+    for (int i = 0; i < RANK; i++) {
+      int d = dims[i];
+      MATX_ASSERT_STR(d < RANK, matxInvalidDim,
+                      "Index to permute is larger than tensor rank");
+      MATX_ASSERT_STR(done[d] == false, matxInvalidParameter,
+                      "Cannot list the same dimension to permute twice");
+      done[d] = true;
+      n[i] = this->Size(d);
+      s[i] = this->Stride(d);
+    }
+
+    Desc new_desc{std::move(n), std::move(s)};  
+    return self_type{this->ldata_, std::move(new_desc)};
+  }
+
+
+  /**
+   * Permute the dimensions of a tensor
+   *
+   * Accepts any order of permutation. Number of dimensions must match RANK of
+   * tensor
+   *
+   * @tparam M
+   *   Rank of tensor to permute. Should not be used directly
+   *
+   * @param dims
+   *   Dimensions of tensor
+   *
+   * @returns tensor view of only imaginary-valued components
+   *
+   */
+  __MATX_INLINE__ auto PermuteImpl(const int32_t (&dims)[RANK]) const
+  {
+    return PermuteImpl(detail::to_array(dims));
+  }
+
+  /**
+   * Permute the last two dimensions of a matrix
+   *
+   * Utility function to permute the last two dimensions of a tensor. This is
+   * useful in the numerous operations that take a permuted matrix as input, but
+   * we don't want to permute the inner dimensions of a larger tensor.
+   *
+   * @tparam M
+   *  Rank of tensor
+   *
+   * @param dims
+   *  Dimensions of tensors
+   *
+   * @returns tensor view with last two dims permuted
+   *
+   */
+  __MATX_INLINE__ auto PermuteMatrixImpl() const
+  {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+    
+    static_assert(RANK >= 2, "Only tensors of rank 2 and higher can be permuted.");
+    int32_t tdims[RANK];
+    std::iota(std::begin(tdims), std::end(tdims), 0);
+    std::swap(tdims[RANK - 2], tdims[RANK - 1]);
+    return PermuteImpl(tdims);
+  }
+
 
 
     /**
