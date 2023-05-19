@@ -43,6 +43,7 @@
 #include "cuda_fp16.h"
 #include "matx/core/half.h"
 #include "matx/core/half_complex.h"
+#include "matx/executors/device.h"
 
 /**
  * Defines type traits for host and device compilers. This file should be includable by
@@ -71,6 +72,9 @@ template< class T >
 struct remove_cvref {
     using type = std::remove_cv_t<std::remove_reference_t<T>>; ///< Type after removal
 };  
+
+template <typename T>
+using remove_cvref_t = typename remove_cvref<T>::type;
 
 template <typename T, int RANK, typename Desc> class tensor_impl_t;
 template <typename T, int RANK, typename Storage, typename Desc> class tensor_t;
@@ -134,13 +138,9 @@ template< class T >
 inline constexpr bool is_tensor_view_v = detail::is_tensor_view<typename remove_cvref<T>::type>::value;
 
 namespace detail {
-template <typename T, typename = void> struct is_executor : std::false_type {
-};
-
-template <typename T>
-struct is_executor<T, std::void_t<typename T::matx_executor>>
-    : std::true_type {
-};
+template <typename T> struct is_executor : std::false_type {};
+template <> struct is_executor<cudaExecutor> : std::true_type {};
+template <> struct is_executor<SingleThreadHostExecutor> : std::true_type {};
 }
 
 /**
@@ -148,10 +148,25 @@ struct is_executor<T, std::void_t<typename T::matx_executor>>
  * 
  * @tparam T Type to test
  */
-template <typename T> constexpr bool is_executor_t()
+template <typename T> 
+constexpr bool is_executor_t()
 {
-  return detail::is_executor<T>::value;
+  return detail::is_executor<typename remove_cvref<T>::type>::value;
 }
+
+
+namespace detail {
+template<typename T> struct is_device_executor : std::false_type {};
+template<> struct is_device_executor<matx::cudaExecutor> : std::true_type {};
+}
+
+/**
+ * @brief Determine if a type is a device executor
+ * 
+ * @tparam T Type to test
+ */
+template <typename T> 
+inline constexpr bool is_device_executor_v = detail::is_device_executor<typename remove_cvref<T>::type>::value;
 
 
 namespace detail {
@@ -235,7 +250,7 @@ struct is_cuda_complex<cuda::std::complex<T>> : std::true_type {
  * @tparam T Type to test
  */
 template <class T>
-inline constexpr bool is_cuda_complex_v = detail::is_cuda_complex<T>::value;
+inline constexpr bool is_cuda_complex_v = detail::is_cuda_complex<remove_cvref_t<T>>::value;
 
 
 
@@ -278,7 +293,6 @@ template <typename T>
 struct inner_op_type_t<T, typename std::enable_if_t<is_complex_v<T>>> { 
   using type = typename T::value_type;
 };
-
 
 
 namespace detail {
@@ -492,6 +506,44 @@ using promote_half_t = typename std::conditional_t<is_half_v<T>, float, T>;
 
 
 namespace detail {
+  
+template <typename T> 
+struct convert_matx_type {
+  using type = T;
+};
+
+template <> 
+struct convert_matx_type<matxFp16> {
+  using type = __half;
+};
+
+template <> 
+struct convert_matx_type<matxBf16> {
+  using type = __nv_bfloat16;
+};
+
+template <typename T> 
+using convert_matx_type_t = typename convert_matx_type<T>::type;
+
+template <typename T> 
+struct convert_half_to_matx_half {
+  using type = T;
+};
+
+template <> 
+struct convert_half_to_matx_half<__half> {
+  using type = matxFp16;
+};
+
+template <> 
+struct convert_half_to_matx_half<__nv_bfloat16> {
+  using type = matxBf16;
+};
+
+template <typename T> 
+using convert_half_to_matx_half_t = typename convert_half_to_matx_half<T>::type;
+
+
 
 template <class T, std::size_t N, std::size_t... I>
 constexpr std::array<std::remove_cv_t<T>, N>
@@ -520,6 +572,36 @@ struct base_type<T, typename std::enable_if_t<is_tensor_view_v<T>>> {
 };
 
 template <typename T> using base_type_t = typename base_type<typename remove_cvref<T>::type>::type;
+
+template <typename T, typename = void> 
+struct complex_from_scalar {
+  using type = T;
+};
+
+template <typename T> 
+struct complex_from_scalar<T, typename std::enable_if_t<std::is_same_v<float, T> || std::is_same_v<double, T>>> {
+  using type = cuda::std::complex<T>;
+};
+
+template <typename T> 
+struct complex_from_scalar<T, typename std::enable_if_t<is_matx_half_v<T> || is_half_v<T> > > {
+  using type = matxHalfComplex<typename convert_half_to_matx_half<T>::type>;
+};
+
+template <typename T> using complex_from_scalar_t = typename complex_from_scalar<typename remove_cvref<T>::type>::type;
+
+
+template <typename T, typename = void> 
+struct exec_type {
+  using type = T;
+};
+
+template <typename T> 
+struct exec_type<T, typename std::enable_if_t<std::is_same_v<T, int>>> {
+  using type = cudaExecutor;
+};
+
+template <typename T> using exec_type_t = typename exec_type<typename remove_cvref<T>::type>::type;
 
 // Type traits to help with the lack of short-circuit template logic. Numpy
 // doesn't support bfloat16 at all, we just use fp32 for the numpy side
@@ -554,8 +636,11 @@ template <typename T> using value_promote_t = promote_half_t<value_type_t<T>>;
 
 template <typename> struct is_std_tuple: std::false_type {};
 template <typename ...T> struct is_std_tuple<std::tuple<T...>>: std::true_type {};
-template <typename T> struct is_std_array : std::false_type {};
-template <typename T, size_t N> struct is_std_array<std::array<T, N>> : std::true_type {};
+
+template<typename T> struct is_std_array : std::false_type {};
+template<typename T, size_t N> struct is_std_array<std::array<T, N>> : std::true_type {};
+template <typename T> inline constexpr bool is_std_array_v = detail::is_std_array<remove_cvref_t<T>>::value;
+
 
 
 // Get the n-th element from a parameter pack

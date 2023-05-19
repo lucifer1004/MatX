@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
 
 set (test_sources
-    00_host/OperatorTests.cc
     00_tensor/BasicTensorTests.cu
     00_tensor/CUBTests.cu
     00_tensor/ViewTests.cu
@@ -13,6 +12,7 @@ set (test_sources
     00_operators/ReductionTests.cu
     00_transform/ConvCorr.cu
     00_transform/MatMul.cu
+    00_transform/Copy.cu
     00_transform/Cov.cu
     00_transform/FFT.cu
     00_transform/Solve.cu
@@ -40,7 +40,7 @@ foreach (ptest ${proprietary_sources})
     list(APPEND proprietary_inc_list ${incdir}/../examples)
 endforeach()
 
-set(target_inc ${CMAKE_SOURCE_DIR}/include/ ${CMAKE_SOURCE_DIR}/include/kernels/ ${CMAKE_SOURCE_DIR}/test/include ${CMAKE_SOURCE_DIR}/examples/ ${proprietary_inc_list})
+set(target_inc ${CMAKE_SOURCE_DIR}/test/include ${CMAKE_SOURCE_DIR}/examples/ ${proprietary_inc_list})
 set(system_inc ${CUTLASS_INC} ${GTEST_INC_DIRS} ${pybind11_INCLUDE_DIR} ${PYTHON_INCLUDE_DIRS})
 
 set(all_test_srcs ${test_sources} ${proprietary_sources})

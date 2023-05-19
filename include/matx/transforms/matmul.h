@@ -452,7 +452,7 @@ private:
   void *c_hp = nullptr; // Make these void since they only work on complex types
   void *a_hp = nullptr;
   void *b_hp = nullptr;
-  size_t workspaceSize = 1 << 25UL; // 16MB buffer suggested by cuBLAS team
+  size_t workspaceSize = 1 << 22UL; // 4MB buffer suggested by cuBLAS team
   void *workspace = nullptr;
   detail::MatMulParams_t params_;
 
@@ -1023,8 +1023,9 @@ __MATX_INLINE__ auto getCublasSupportedTensor( const Op &in, cudaStream_t stream
     
       // either RANK-1 or RANK-2 stride must equal one in cublasLt
       (in.Stride(RANK-1) != 1 && in.Stride(RANK-2) != 1) || 
-      // cloned matrices not supported in cublas
-      (in.Stride(RANK-1) == 0 || in.Stride(RANK-2) == 0)
+      // cublas allows 0 strides, but verify that the corresponding size is 1
+      (in.Stride(RANK-1) == 0 && in.Size(RANK-1) != 1) ||
+      (in.Stride(RANK-2) == 0 && in.Size(RANK-2) != 1)
       ) {
       supported = false;
     }

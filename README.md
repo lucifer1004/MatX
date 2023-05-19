@@ -49,6 +49,8 @@ are necessary
 ## Requirements
 MatX support is currently limited to **Linux only** due to the time to test Windows. If you'd like to voice your support for native Windows support using Visual Studio, please comment on the issue here: https://github.com/NVIDIA/MatX/issues/153.
 
+**Note**: Both CUDA 12.0.0 and CUDA 12.1.0 have an issue that causes building MatX unit tests to show a compiler error or cause a segfault in the compiler. We are looking into this issue. CUDA 11.8 does not have either of these issues.
+
 MatX is using features in C++17 and the latest CUDA compilers and libraries. For this reason, when running with GPU support, CUDA 11.4 and g++9 or newer is required. You can download the CUDA Toolkit [here](https://developer.nvidia.com/cuda-downloads).
 
 MatX has been tested on and supports Pascal, Turing, Volta, Ampere, and Hopper GPU architectures. Jetson products are supported with Jetpack 5.0 or above.
@@ -78,7 +80,7 @@ By default CMake will target the GPU architecture(s) of the system you're compil
 `CMAKE_CUDA_ARCHITECTURES` flag with a list of architectures to build for:
 
 ```sh
-cmake .. -DCMAKE_CUDA_ARCHITECTURES="60;70"
+cmake .. -DCMAKE_CUDA_ARCHITECTURES="80;90"
 ```
 
 By default nothing is compiled. If you wish to compile certain options, use the CMake flags below with ON or OFF values:
@@ -193,6 +195,22 @@ We provide a variety of training materials and examples to quickly learn the Mat
 - Finally, for new MatX developers, browsing the [example applications](examples) can provide familarity with the API and best practices.
 
 ## Release Major Features
+*v0.4.0*:
+* SVD power iteration function
+* `sign`, and `index` operators
+* Batched QR for small matrices
+* dlpack export support
+* 16-bit float reductions
+* Output iterator support in CUB
+
+*v0.3.0*:
+* Many new operators, including `flatten`, `remap`, `lcollapse`. `rcollapse`, `fmod`, `clone`, `slice`
+* Extended N-D tensor support to more functions
+* Allow operators on reduction inputs
+* g++11 support
+* NVTX support
+* Many, many bug fixes
+
 *v0.2.3*:
 * Several new functions: `find`, `find_idx`, `unique`, and `chirp`
 * cuTENSOR and cuTensorNet integration for new `einsum` function
@@ -201,11 +219,6 @@ We provide a variety of training materials and examples to quickly learn the Mat
    
 *v0.2.2*:
 * Arbitrary tensor ranks
-   
-*v0.2.1*:
-* Generic storage and descriptor types
-* Static tensor dimensions for compile-time sizes and strides
-* Slew of new ``make_`` helper functions and documentation
 
 ## Discussions
 We have an open discussions board [here](https://github.com/NVIDIA/MatX/discussions). We encourage any questions about the library to be posted here for other users to learn from and read through.

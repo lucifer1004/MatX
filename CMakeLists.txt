@@ -88,8 +88,8 @@ add_library(matx INTERFACE)
 add_library(matx::matx ALIAS matx)
 target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
                                          "$<INSTALL_INTERFACE:include>")
-target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/kernels>"
-"$<INSTALL_INTERFACE:include/kernels>")                                         
+target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/matx/kernels>"
+"$<INSTALL_INTERFACE:include/matx/kernels>")                                         
 target_compile_features(matx INTERFACE cxx_std_17 $<BUILD_INTERFACE:cuda_std_17>)
 target_compile_options(matx INTERFACE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
 
@@ -100,7 +100,7 @@ endif()
 
 # We typically need newer versions libcudacxx than availabled in the toolkit.  pull down specific version here
 message(STATUS "Need libcuda++. Finding...")
-set(LIBCUDACXX_VERSION "1.8.1" CACHE STRING "Version of libcudacxx to use")
+set(LIBCUDACXX_VERSION "2.1.0" CACHE STRING "Version of libcudacxx to use")
 include(cmake/FindLibcudacxx.cmake)
 target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${LIBCUDACXX_INCLUDE_DIR}>")    
 

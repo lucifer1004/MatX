@@ -36,7 +36,9 @@
 #include <functional>
 
 #include "matx/core/nvtx.h"
+#include "matx/core/dlpack.h"
 #include "matx/core/make_tensor.h"
+#include "matx/kernels/utility.cuh"
 
 namespace matx
 {
@@ -160,14 +162,14 @@ namespace detail {
   template <typename Func, typename Tuple, size_t... S>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) apply_impl(Func &&f, Tuple&& tuple, std::index_sequence<S...>)  {
     
-    if constexpr (is_std_tuple<std::remove_reference_t<Tuple>>::value || is_std_array<std::remove_reference_t<Tuple>>::value) {
+    if constexpr (is_std_tuple<remove_cvref_t<Tuple>>::value || is_std_array<remove_cvref_t<Tuple>>::value) {
       return cuda::std::invoke(std::forward<Func>(f), std::get<S>(std::forward<Tuple>(tuple))...);
     }
     else {
       return cuda::std::invoke(std::forward<Func>(f), cuda::std::get<S>(std::forward<Tuple>(tuple))...);
     }
 
-    if constexpr (!(is_std_tuple<std::remove_reference_t<Tuple>>::value || is_std_array<std::remove_reference_t<Tuple>>::value)) {
+    if constexpr (!(is_std_tuple<remove_cvref_t<Tuple>>::value || is_std_array<remove_cvref_t<Tuple>>::value)) {
             return cuda::std::invoke(std::forward<Func>(f), cuda::std::get<S>(std::forward<Tuple>(tuple))...);
     }
     else {
@@ -178,52 +180,52 @@ namespace detail {
   template <class Func, class Tuple>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr decltype(auto) mapply(Func&& f, Tuple&& t)
   {
-    if constexpr (is_std_tuple<std::remove_reference_t<Tuple>>::value || is_std_array<std::remove_reference_t<Tuple>>::value) {
+    if constexpr (is_std_tuple<remove_cvref_t<Tuple>>::value || is_std_array<remove_cvref_t<Tuple>>::value) {
       return apply_impl(
           std::forward<Func>(f), std::forward<Tuple>(t),
-          std::make_index_sequence<std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
+          std::make_index_sequence<std::tuple_size_v<remove_cvref_t<Tuple>>>{});
     }
     else {
       return apply_impl(
           std::forward<Func>(f), std::forward<Tuple>(t),
-          std::make_index_sequence<cuda::std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
+          std::make_index_sequence<cuda::std::tuple_size_v<remove_cvref_t<Tuple>>>{});
     }
 
-    if constexpr (!(is_std_tuple<std::remove_reference_t<Tuple>>::value || is_std_array<std::remove_reference_t<Tuple>>::value)) {
+    if constexpr (!(is_std_tuple<remove_cvref_t<Tuple>>::value || is_std_array<remove_cvref_t<Tuple>>::value)) {
       return apply_impl(
           std::forward<Func>(f), std::forward<Tuple>(t),
-          std::make_index_sequence<cuda::std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
+          std::make_index_sequence<cuda::std::tuple_size_v<remove_cvref_t<Tuple>>>{});
     }
     else {
       return apply_impl(
           std::forward<Func>(f), std::forward<Tuple>(t),
-          std::make_index_sequence<std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
+          std::make_index_sequence<std::tuple_size_v<remove_cvref_t<Tuple>>>{});
     }
   }
 
   template <class Func, class Tuple>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr decltype(auto) mapply_reverse(Func&& f, Tuple&& t)
   {
-    if constexpr (is_std_tuple<std::remove_reference_t<Tuple>>::value || is_std_array<std::remove_reference_t<Tuple>>::value) {
+    if constexpr (is_std_tuple<remove_cvref_t<Tuple>>::value || is_std_array<remove_cvref_t<Tuple>>::value) {
       return apply_impl(
           std::forward<Func>(f), std::forward<Tuple>(t),
-          make_index_sequence_rev<std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
+          make_index_sequence_rev<std::tuple_size_v<remove_cvref_t<Tuple>>>{});
     }
     else {
       return apply_impl(
           std::forward<Func>(f), std::forward<Tuple>(t),
-          make_index_sequence_rev<cuda::std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
+          make_index_sequence_rev<cuda::std::tuple_size_v<remove_cvref_t<Tuple>>>{});
     }
 
-    if constexpr (!(is_std_tuple<std::remove_reference_t<Tuple>>::value || is_std_array<std::remove_reference_t<Tuple>>::value)) {
+    if constexpr (!(is_std_tuple<remove_cvref_t<Tuple>>::value || is_std_array<remove_cvref_t<Tuple>>::value)) {
       return apply_impl(
           std::forward<Func>(f), std::forward<Tuple>(t),
-          make_index_sequence_rev<cuda::std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
+          make_index_sequence_rev<cuda::std::tuple_size_v<remove_cvref_t<Tuple>>>{});
     }
     else {
       return apply_impl(
           std::forward<Func>(f), std::forward<Tuple>(t),
-          make_index_sequence_rev<std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
+          make_index_sequence_rev<std::tuple_size_v<remove_cvref_t<Tuple>>>{});
     }
   }
 
@@ -448,6 +450,51 @@ namespace detail {
   }
 
 
+  template <typename T> constexpr DLDataType TypeToDLPackType()
+  {
+    if constexpr (std::is_same_v<T, cuda::std::complex<float>>)
+      return {kDLComplex, 64, 1};
+    if constexpr (std::is_same_v<T, cuda::std::complex<double>>)
+      return {kDLComplex, 128, 1};
+    if constexpr (std::is_same_v<T, matxFp16>)
+      return {kDLFloat, 16, 1};
+    if constexpr (std::is_same_v<T, matxBf16>)
+      return {kDLBfloat, 16, 1};
+    if constexpr (std::is_same_v<T, matxFp16Complex>)
+      return {kDLComplex, 32, 1};
+    if constexpr (std::is_same_v<T, matxBf16Complex>)
+      return {kDLComplex, 32, 1}; // Wrong, but no other choice
+    if constexpr (std::is_same_v<T, float>)
+      return {kDLFloat, 32, 1};
+    if constexpr (std::is_same_v<T, double>)
+      return {kDLFloat, 64, 1};
+    if constexpr (std::is_same_v<T, int8_t>)
+      return {kDLInt, 8, 1};
+    if constexpr (std::is_same_v<T, int16_t>)
+      return {kDLInt, 16, 1};
+    if constexpr (std::is_same_v<T, int32_t>)
+      return {kDLInt, 32, 1};
+    if constexpr (std::is_same_v<T, int64_t>)
+      return {kDLInt, 64, 1};
+    if constexpr (std::is_same_v<T, uint8_t>)
+      return {kDLUInt, 8, 1};
+    if constexpr (std::is_same_v<T, uint16_t>)
+      return {kDLUInt, 16, 1};
+    if constexpr (std::is_same_v<T, uint32_t>)
+      return {kDLUInt, 32, 1};
+    if constexpr (std::is_same_v<T, uint64_t>)
+      return {kDLUInt, 64, 1};    
+    if constexpr (std::is_same_v<T, bool>)
+#if DLPACK_VERSION >= 80      
+      return {kDLBool, 8, 1};
+#else
+      return {kDLUInt, 8, 1};
+#endif      
+
+    return {kDLOpaqueHandle, 1, 1};
+  }  
+
+
   /**
    * Print a value
    *
@@ -622,10 +669,65 @@ namespace detail {
   }
 } // end namespace detail
 
-static constexpr bool PRINT_ON_DEVICE = false;      ///< Print() uses printf on device
+static constexpr bool PRINT_ON_DEVICE = false;      ///< print() uses printf on device
 
 /**
  * @brief Print a tensor's values to stdout
+ *
+ * This is the internal `PrintData()` that takes integral values for each index, and prints that as many values
+
+ * in each dimension as the arguments specify. For example:
+ *
+ * `print(a, 2, 3, 2);`
+ *
+ * Will print 2 values of the first, 3 values of the second, and 2 values of the third dimension
+ * of a 3D tensor. The number of parameters must match the rank of the tensor. A special value of
+ * 0 can be used if the entire tensor should be printed:
+ *
+ * `print(a, 0, 0, 0);` // Prints the whole tensor
+ *
+ * For more fine-grained printing, see the over `print()` overloads.
+ *
+ * @tparam Args Integral argument types
+ * @param op input Operator
+ * @param dims Number of values to print for each dimension
+ */
+// template <typename Op, typename... Args,
+//           std::enable_if_t<((std::is_integral_v<Args>)&&...) &&
+//                                 (Op::Rank() == 0 || sizeof...(Args) > 0),
+//                             bool> = true>
+// void PrintData(const Op &op, Args... dims) {
+//   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
+// #ifdef __CUDACC__
+//   cudaDeviceSynchronize();
+//   if constexpr (is_tensor_view_v<Op>) {
+//     auto kind = GetPointerKind(op.Data());
+//     if (HostPrintable(kind)) {
+//       detail::InternalPrint(op, dims...);
+//     }
+//     else if (DevicePrintable(kind) || kind == MATX_INVALID_MEMORY) {
+//       if constexpr (PRINT_ON_DEVICE) {
+//         PrintKernel<<<1, 1>>>(op, dims...);
+//       }
+//       else {
+//         auto tmpv = make_tensor<typename Op::scalar_type>(op.Shape());
+//         (tmpv = op).run();
+//         PrintData(tmpv, dims...);
+//       }
+//     }
+//   }
+//   else {
+//     InternalPrint(op, dims...);
+//   }
+// #else
+//   InternalPrint(op, dims...);
+// #endif
+// }
+
+
+/**
+ * @brief print a tensor's values to stdout
  *
  * This is a wrapper utility function to print the type, size and stride of tensor,
  * see PrintData for details of internal tensor printing options
@@ -638,7 +740,7 @@ template <typename Op, typename... Args,
           std::enable_if_t<((std::is_integral_v<Args>)&&...) &&
                                 (Op::Rank() == 0 || sizeof...(Args) > 0),
                             bool> = true>
-void Print(const Op &op, Args... dims) 
+void print(const Op &op, Args... dims) 
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   
@@ -706,10 +808,25 @@ void PrintData(const Op &op, Args... dims) {
   cudaDeviceSynchronize();
   if constexpr (is_tensor_view_v<Op>) {
     auto kind = GetPointerKind(op.Data());
-    if (HostPrintable(kind)) {
+
+    // Try to get pointer from cuda 
+    if (kind == MATX_INVALID_MEMORY) {
+      CUmemorytype mtype;
+      void *data[] = {&mtype};
+      CUpointer_attribute attrs[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
+      auto ret = cuPointerGetAttributes(1, 
+                                        &attrs[0], 
+                                        data, 
+                                        reinterpret_cast<CUdeviceptr>(op.Data()));
+      MATX_ASSERT_STR_EXP(ret, CUDA_SUCCESS, matxCudaError, "Failed to get memory type");
+      MATX_ASSERT_STR(mtype == CU_MEMORYTYPE_HOST || mtype == 0, matxNotSupported, "Invalid memory type for printing");
+
       detail::InternalPrint(op, dims...);
     }
-    else if (DevicePrintable(kind) || kind == MATX_INVALID_MEMORY) {
+    else if (kind == MATX_INVALID_MEMORY || HostPrintable(kind)) {
+      detail::InternalPrint(op, dims...);
+    }
+    else if (DevicePrintable(kind)) {
       if constexpr (PRINT_ON_DEVICE) {
         PrintKernel<<<1, 1>>>(op, dims...);
       }
@@ -731,19 +848,19 @@ void PrintData(const Op &op, Args... dims) {
 /**
  * @brief Print a tensor's all values to stdout
  *
- * This form of `Print()` is an alias of `Print(0)`, `Print(0, 0)`,
- * `Print(0, 0, 0)` and `Print(0, 0, 0, 0)` for 1D, 2D, 3D and 4D tensor
- * respectively. It passes the proper number of zeros to `Print(...)`
+ * This form of `print()` is an alias of `print(op, 0)`, `print(op, 0, 0)`,
+ * `print(op, 0, 0, 0)` and `print(op, 0, 0, 0, 0)` for 1D, 2D, 3D and 4D tensor
+ * respectively. It passes the proper number of zeros to `print(...)`
  * automatically according to the rank of this tensor. The user only have to
- * invoke `.Print()` to print the whole tensor, instead of passing zeros
+ * invoke `print(op)` to print the whole tensor, instead of passing zeros
  * manually.
  */
 template <typename Op, typename... Args,
           std::enable_if_t<(Op::Rank() > 0 && sizeof...(Args) == 0), bool> = true>
-void Print(const Op &op, Args... dims) {
+void print(const Op &op, Args... dims) {
   std::array<int, Op::Rank()> arr = {0};
   auto tp = std::tuple_cat(arr);
-  std::apply([&](auto &&...args) { Print(op, args...); }, tp);
+  std::apply([&](auto &&...args) { print(op, args...); }, tp);
 }
 
 }
