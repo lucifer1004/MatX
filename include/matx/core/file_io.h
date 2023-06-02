@@ -250,6 +250,46 @@ void WriteMAT(const TensorType &t, const std::string fname,
   auto obj = sp.attr("savemat")("file_name"_a = fname, "mdict"_a = td);
 }
 
+/**
+* @brief Append TensorType to python dictionary
+*
+* @param td
+*   Python dictionary to add tensor to
+* @param var
+*   Variable name (key)
+* @param t
+*   Tensor to add (value)
+*/
+template <typename TensorType, typename DictType>
+auto AddToPyDict(std::string var, const TensorType & t, DictType && td) {
+  auto pb = std::make_unique<detail::MatXPybind>();
+  auto np_ten = pb->TensorViewToNumpy(t);
+
+  td[var.c_str()] = np_ten;
+  return td;
+}
+
+
+/**
+ * @brief Write a MAT file from a python dictionary
+ *
+ * Writes a single tensor value into a .mat file.
+ *
+ * @param td
+ *   Python dictionary to save. Keys to dictionary are variable names.
+ * @param fname
+ *   File name of .mat file
+ */
+inline void WriteMAT(const pybind11::dict & td, const std::string fname)
+{
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)  
+
+  auto np = pybind11::module_::import("numpy");
+  auto sp = pybind11::module_::import("scipy.io");  
+
+  auto obj = sp.attr("savemat")("file_name"_a = fname, "mdict"_a = td);
+}
+
 }; // namespace io
 }; // namespace matx
 

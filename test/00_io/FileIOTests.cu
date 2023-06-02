@@ -125,3 +125,36 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATWrite)
 
   MATX_EXIT_HANDLER();
 }
+
+TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATWriteSeveral)
+{
+  MATX_ENTER_HANDLER();
+
+  auto t = make_tensor<TypeParam>({2,3});
+  auto t2 = make_tensor<TypeParam>({2,3});
+  auto t3 = make_tensor<TypeParam>({2,3});
+  auto t4 = make_tensor<TypeParam>({2,3});
+  t.SetVals({{1,2,3},{4,5,6}});
+  t2.SetVals({{0,2,3},{4,5,6}});
+
+  auto td = io::AddToPyDict("t", t, pybind11::dict{});
+  io::AddToPyDict("t2", t2, td);
+
+  // Read "t" from mat file
+  io::WriteMAT(td, "test_write.mat");
+  io::ReadMAT(t3, "test_write.mat", "t");
+  for (index_t i = 0; i < t.Size(0); i++) {
+    for (index_t j = 0; j < t.Size(1); j++) {
+      ASSERT_EQ(t(i,j), t3(i,j));
+    }
+  }
+
+  io::ReadMAT(t4, "test_write.mat", "t2");
+  for (index_t i = 0; i < t.Size(0); i++) {
+    for (index_t j = 0; j < t.Size(1); j++) {
+      ASSERT_EQ(t2(i,j), t4(i,j));
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
