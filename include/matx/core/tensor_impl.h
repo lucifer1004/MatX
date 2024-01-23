@@ -826,7 +826,7 @@ class tensor_impl_t {
      * 
      * @return data pointer 
      */
-    auto Data() const noexcept {
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  auto Data() const noexcept {
       return ldata_;
     } 
 

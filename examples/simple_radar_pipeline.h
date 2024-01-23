@@ -245,7 +245,7 @@ public:
     (waveformPart = waveformPart * hamming<0>({waveformLength})).run(stream);
 
     // compute L2 norm
-    (norms = sum(norm(waveformPart))).run(stream);
+    (norms = sum(abs2(waveformPart))).run(stream);
     (norms = sqrt(norms)).run(stream);
 
     (waveformPart = waveformPart / norms).run(stream);
@@ -350,7 +350,7 @@ public:
    */
   void CFARDetections()
   {
-    (xPow = norm(tpcView)).run(stream);
+    (xPow = abs2(tpcView)).run(stream);
 
     // Estimate the background average power in each cell
     // background_averages = conv2(Xpow, mask, 'same') ./ norm;

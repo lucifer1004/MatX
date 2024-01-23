@@ -172,6 +172,53 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     }
   }
 
+  {
+    auto a = make_tensor<float>({5});
+    auto b = make_tensor<float>({});
+    a.SetVals({5.0, 1.0, 2.0, -3.0, 4.0});
+    (b = vector_norm(a)).run();
+    print(b);
+
+    (b = vector_norm(a, NormOrder::L1)).run();
+    print(b);
+  }
+
+  {
+    auto a = make_tensor<cuda::std::complex<float>>({5});
+    auto b = make_tensor<cuda::std::complex<float>>({});
+    (a = random<cuda::std::complex<float>>({5}, NORMAL)).run();
+    print(a);
+    (b = vector_norm(a)).run();
+    print(b);
+
+    (b = vector_norm(a, NormOrder::L1)).run();
+    print(b);
+  }
+
+  {
+    auto a = make_tensor<cuda::std::complex<float>>({5,8});
+    auto b = make_tensor<float>({5});
+    (a = random<cuda::std::complex<float>>({5,8}, NORMAL)).run();
+    print(a);
+    (b = vector_norm(a)).run();
+    print(b);
+
+    (b = vector_norm(a, NormOrder::L1)).run();
+    print(b);
+  }
+
+  {
+    auto a = make_tensor<cuda::std::complex<float>>({5,8});
+    auto b = make_tensor<float>({});
+    (a = random<cuda::std::complex<float>>({5,8}, NORMAL)).run();
+    print(a);
+    (b = matrix_norm(a)).run();
+    print(b);
+
+    (b = matrix_norm(a, NormOrder::L1)).run();
+    print(b);
+  }  
+
   std::cout << "Verification successful" << std::endl;
 
   CUDA_CHECK_LAST_ERROR();
