@@ -399,6 +399,10 @@ template <> struct is_complex<matxFp16Complex> : std::true_type {
 };
 template <> struct is_complex<matxBf16Complex> : std::true_type {
 };
+template <> struct is_complex<cuda::std::complex<__half>> : std::true_type {
+};
+template <> struct is_complex<cuda::std::complex<__nv_bfloat16>> : std::true_type {
+};
 }
 
 /**
@@ -444,6 +448,7 @@ struct inner_op_type_t<T, typename std::enable_if_t<is_complex_v<T>>> {
 
 namespace detail {
 template <typename T> struct is_bf16_type : std::false_type {};
+template <> struct is_bf16_type<cuda::std::complex<__nv_bfloat16>> : std::true_type {};
 template <> struct is_bf16_type<matxBf16Complex> : std::true_type {};
 template <> struct is_bf16_type<matxBf16> : std::true_type {};
 }
@@ -571,7 +576,9 @@ template <typename T>
 struct is_complex_half
     : std::integral_constant<
           bool, std::is_same_v<matxFp16Complex, std::remove_cv_t<T>> ||
-                    std::is_same_v<matxBf16Complex, std::remove_cv_t<T>>> {
+                    std::is_same_v<matxBf16Complex, std::remove_cv_t<T>> ||
+                    std::is_same_v<cuda::std::complex<__nv_bfloat16>, std::remove_cv_t<T>> ||
+                    std::is_same_v<cuda::std::complex<__half>, std::remove_cv_t<T>>> {
 };
 }
 
@@ -778,7 +785,7 @@ template <class T> struct identity {
 };
 template <class C>
 struct complex_type_of
-    : identity<std::complex<std::conditional_t<is_complex_half_v<C>, float,
+    : identity<cuda::std::complex<std::conditional_t<is_complex_half_v<C>, float,
                                                typename C::value_type>>> {
 };
 
@@ -905,6 +912,10 @@ template <typename T> constexpr MatXDataType_t TypeToInt()
     return MATX_TYPE_COMPLEX_FP16;
   if constexpr (std::is_same_v<T, matxBf16Complex>)
     return MATX_TYPE_COMPLEX_BF16;
+  if constexpr (std::is_same_v<T, cuda::std::complex<__half>>)
+    return MATX_TYPE_COMPLEX_FP16;
+  if constexpr (std::is_same_v<T, cuda::std::complex<__nv_bfloat16>>)
+    return MATX_TYPE_COMPLEX_BF16;    
   if constexpr (std::is_same_v<T, float>)
     return MATX_TYPE_FP32;
   if constexpr (std::is_same_v<T, double>)
@@ -944,10 +955,10 @@ template <> struct IntToType<MATX_TYPE_BF16> {
   using value_type = matxBf16;
 };
 template <> struct IntToType<MATX_TYPE_COMPLEX_FP16> {
-  using value_type = matxFp16Complex;
+  using value_type = cuda::std::complex<__half>;
 };
 template <> struct IntToType<MATX_TYPE_COMPLEX_BF16> {
-  using value_type = matxBf16Complex;
+  using value_type = cuda::std::complex<__nv_bfloat16>;
 };
 template <> struct IntToType<MATX_TYPE_FP32> {
   using value_type = float;
@@ -1010,6 +1021,12 @@ template <typename T> constexpr cudaDataType_t MatXTypeToCudaType()
   if constexpr (std::is_same_v<T, matxBf16Complex>) {
     return CUDA_C_16BF;
   }
+  if constexpr (std::is_same_v<T, cuda::std::complex<__half>>) {
+    return CUDA_C_16F;
+  }
+  if constexpr (std::is_same_v<T, cuda::std::complex<__nv_bfloat16>>) {
+    return CUDA_C_16BF;
+  }  
 
   return CUDA_C_32F;
 }
@@ -1019,7 +1036,9 @@ template <typename T> constexpr cublasComputeType_t MatXTypeToCudaComputeType()
   if constexpr (std::is_same_v<T, cuda::std::complex<float>> ||
                 std::is_same_v<T, float> || is_matx_half_v<T> ||
                 std::is_same_v<T, matxFp16Complex> ||
-                std::is_same_v<T, matxBf16Complex>) {
+                std::is_same_v<T, matxBf16Complex> ||
+                std::is_same_v<T, cuda::std::complex<__nv_bfloat16>> ||
+                std::is_same_v<T, cuda::std::complex<__half>>) {
     return CUBLAS_COMPUTE_32F;
   }
   if constexpr (std::is_same_v<T, cuda::std::complex<double>> ||

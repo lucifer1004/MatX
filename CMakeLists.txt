@@ -106,7 +106,7 @@ endif()
 
 # libcudacxx is now part of CCCL, so grab that repo if needed
 message(STATUS "Need CCCL. Finding...")
-set(CCCL_VERSION "v2.2.0" CACHE STRING "Version of CCCL to use")
+set(CCCL_VERSION "ec05b1c4945b8195fcd09b8fe551152e64be054d" CACHE STRING "Version of CCCL to use")
 include(cmake/FindCCCL.cmake)
 
 target_include_directories(matx SYSTEM INTERFACE

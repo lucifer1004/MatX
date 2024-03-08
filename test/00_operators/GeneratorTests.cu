@@ -515,8 +515,8 @@ TYPED_TEST(BasicGeneratorTestsNumeric, Eye)
   (t4 = eye_op).run();
   // example-end eye-gen-test-1
 
-  TypeParam one = 1.0f;
-  TypeParam zero = 0.0f;
+  TypeParam one = static_cast<typename inner_op_type_t<TypeParam>::type>(1.0f);
+  TypeParam zero = static_cast<typename inner_op_type_t<TypeParam>::type>(0.0f);
 
   cudaDeviceSynchronize();
 

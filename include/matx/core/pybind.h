@@ -312,10 +312,22 @@ public:
   }
 
   template <typename T>
+  inline cuda::std::complex<__half> ConvertComplex(const cuda::std::complex<__half> in)
+  {
+    return {in.real(), in.imag()};
+  }
+
+  template <typename T>
   inline matxBf16Complex ConvertComplex(const matxBf16Complex in)
   {
     return {in.real(), in.imag()};
   }
+
+  template <typename T>
+  inline cuda::std::complex<__nv_bfloat16> ConvertComplex(const cuda::std::complex<__nv_bfloat16> in)
+  {
+    return {in.real(), in.imag()};
+  }  
 
   template <typename TensorType>
   void NumpyToTensorView(TensorType &ten,

@@ -55,13 +55,13 @@ template <> auto inline GenerateData<int64_t>() { return (int64_t)-1; }
 template <> auto inline GenerateData<uint64_t>() { return(uint64_t) 1; }
 template <> auto inline GenerateData<float>() { return (float)1.0f; }
 template <> auto inline GenerateData<double>() { return (double)1.5; }
-template <> auto inline GenerateData<matx::matxFp16Complex>()
+template <> auto inline GenerateData<cuda::std::complex<__half>>()
 {
-  return matx::matxFp16Complex(1.5, -2.5);
+  return cuda::std::complex<__half>(1.5, -2.5);
 }
-template <> auto inline GenerateData<matx::matxBf16Complex>()
+template <> auto inline GenerateData<cuda::std::complex<__nv_bfloat16>>()
 {
-  return matx::matxBf16Complex(1.5, -2.5);
+  return cuda::std::complex<__nv_bfloat16>(1.5, -2.5);
 }
 template <> auto inline GenerateData<cuda::std::complex<float>>()
 {
@@ -79,11 +79,11 @@ using ExecutorTypesAll = std::tuple<matx::cudaExecutor, matx::HostExecutor>;
 
 using MatXAllTypes = Types<matx::matxFp16, matx::matxBf16, bool, uint32_t, int32_t, uint64_t,
               int64_t, float, double, cuda::std::complex<float>,
-              cuda::std::complex<double>, matx::matxFp16Complex,
-              matx::matxBf16Complex>;
+              cuda::std::complex<double>, cuda::std::complex<__half>,
+              cuda::std::complex<__nv_bfloat16>>;
 using MatXFloatTypes = Types<matx::matxFp16, matx::matxBf16, float, double,
               cuda::std::complex<float>, cuda::std::complex<double>,
-              matx::matxFp16Complex, matx::matxBf16Complex>;
+              cuda::std::complex<__half>, cuda::std::complex<__nv_bfloat16>>;
 using MatXFloatNonHalfTypes = Types<float, double,
               cuda::std::complex<float>, cuda::std::complex<double>>;
 using MatXFloatNonComplexTypes = Types<matx::matxFp16, matx::matxBf16, float, double>;
@@ -91,15 +91,15 @@ using MatXFloatNonComplexTypes = Types<matx::matxFp16, matx::matxBf16, float, do
 using MatXFloatHalfTypes = Types<matx::matxFp16, matx::matxBf16>;
 using MatXNumericTypes = Types<matx::matxFp16, matx::matxBf16, uint32_t, int32_t, uint64_t,
               int64_t, float, double, cuda::std::complex<float>,
-              cuda::std::complex<double>, matx::matxFp16Complex,
-              matx::matxBf16Complex>;
+              cuda::std::complex<double>, cuda::std::complex<__half>,
+              cuda::std::complex<__nv_bfloat16>>;
 
 using MatXNumericNoHalfTypes = Types<uint32_t, int32_t, uint64_t, int64_t, float, double,
               cuda::std::complex<float>, cuda::std::complex<double>>;
 using MatXBoolTypes =  Types<bool>;
 using MatXFloatNonComplexNonHalfTypes = Types<float, double>;
 using MatXComplexTypes = Types<cuda::std::complex<float>, cuda::std::complex<double>,
-              matx::matxFp16Complex, matx::matxBf16Complex>;
+              cuda::std::complex<__half>, cuda::std::complex<__nv_bfloat16>>;
 using MatXComplexNonHalfTypes = Types<cuda::std::complex<float>, cuda::std::complex<double>>;
 using MatXNumericNonComplexTypes = Types<uint32_t, int32_t, uint64_t, int64_t, float, double>;
 using MatXAllIntegralTypes = Types<uint32_t, int32_t, uint64_t, int64_t>;
@@ -142,20 +142,20 @@ using MatXNumericNoHalfTuple                 = std::tuple<uint32_t, int32_t, uin
 using MatXComplexNonHalfTuple                = std::tuple<cuda::std::complex<float>, cuda::std::complex<double>>;
 using MatXNumericNonComplexTuple             = std::tuple<uint32_t, int32_t, uint64_t, int64_t, float, double>;
 using MatXComplexTuple                       = std::tuple<cuda::std::complex<float>, cuda::std::complex<double>,
-                                                          matx::matxFp16Complex, matx::matxBf16Complex>;
+                                                          cuda::std::complex<__half>, cuda::std::complex<__nv_bfloat16>>;
                                                           
 using MatXAllTuple                           = std::tuple<matx::matxFp16, matx::matxBf16, bool, uint32_t, int32_t, uint64_t,
                                                       int64_t, float, double, cuda::std::complex<float>,
-                                                      cuda::std::complex<double>, matx::matxFp16Complex,
-                                                      matx::matxBf16Complex>;
+                                                      cuda::std::complex<double>, cuda::std::complex<__half>,
+                                                      cuda::std::complex<__nv_bfloat16>>;
 using MatXFloatTuple                         = std::tuple< matx::matxFp16, matx::matxBf16, float, double,
                                                            cuda::std::complex<float>, cuda::std::complex<double>,
-                                                           matx::matxFp16Complex, matx::matxBf16Complex>;    
+                                                           cuda::std::complex<__half>, cuda::std::complex<__nv_bfloat16>>;    
 
 using MatXNumericTuple                       = std::tuple<matx::matxFp16, matx::matxBf16, uint32_t, int32_t, uint64_t,
                                               int64_t, float, double, cuda::std::complex<float>,
-                                              cuda::std::complex<double>, matx::matxFp16Complex,
-                                              matx::matxBf16Complex>;     
+                                              cuda::std::complex<double>, cuda::std::complex<__half>,
+                                              cuda::std::complex<__nv_bfloat16>>;     
 using MatXIntegralTuple                      = std::tuple<uint32_t, int32_t, uint64_t, int64_t>;                                                                                                                                                         
 
 using MatXFloatNonComplexTuple               = std::tuple<matx::matxFp16, matx::matxBf16, float, double>;                                                      

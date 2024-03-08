@@ -97,7 +97,9 @@ constexpr bool CompatibleGemmTypes() {
               std::is_same_v<typename OpA::scalar_type, cuda::std::complex<double>> ||
               std::is_same_v<typename OpA::scalar_type, int8_t> ||
               std::is_same_v<typename OpA::scalar_type, matxFp16Complex> ||
-              std::is_same_v<typename OpA::scalar_type, matxBf16Complex>;
+              std::is_same_v<typename OpA::scalar_type, matxBf16Complex> ||
+              std::is_same_v<typename OpA::scalar_type, cuda::std::complex<__half>> ||
+              std::is_same_v<typename OpA::scalar_type, cuda::std::complex<__nv_bfloat16>>;
 
     }
     // Accumulator type different from A/B
@@ -459,9 +461,9 @@ public:
       cublasLtMatmulDescDestroy(operationDesc);
     }
 
-    matxFree(a_hp);
-    matxFree(b_hp);
-    matxFree(c_hp);
+    matxFree(a_hp, cudaStreamDefault);
+    matxFree(b_hp, cudaStreamDefault);
+    matxFree(c_hp, cudaStreamDefault);
   }
 
 /**

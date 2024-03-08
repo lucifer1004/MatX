@@ -52,6 +52,7 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
   using ftype_strip = typename FilterType::scalar_type;
   using intype_strip = typename InType::scalar_type;
   using outtype_strip = typename OutType::scalar_type;
+  using out_inner_t = typename inner_op_type_t<outtype_strip>::type;
   uint32_t filter_len = d_filter.Size(Rank-1);
   uint32_t full_len = signal_len + filter_len - 1;
 
@@ -114,7 +115,7 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
     __syncthreads();
 
     // register array for output data  
-    outtype_strip oval[EPT] = {0}; 
+    outtype_strip oval[EPT] = {static_cast<out_inner_t>(0)}; 
 
     // Below will use pointer modification instead of offsets to change IMADS into IADS.  IMADS go through FMA pipe.
 
@@ -209,6 +210,7 @@ __global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
   using in1type = typename InType1::scalar_type;
   using in2type = typename InType2::scalar_type;
   using outtype = typename OutType::scalar_type;
+  using out_inner_t = typename inner_op_type_t<outtype>::type;
 
   // length of signal chunk in shared memory
   constexpr int SIGNAL_CHUNK_X = BLOCK_DIM_X + FILTER_SHARED_CHUNK_X;
@@ -257,7 +259,7 @@ __global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
         index_t i = bi + threadIdx.y * ILPY;
         index_t j = bj + threadIdx.x;
 
-        outtype sum[ILPY] = {0};
+        outtype sum[ILPY] = {out_inner_t{0}};
 
         // for each shared memory filter chunk
         for (index_t nStart = 0; nStart < i2N; nStart+=FILTER_SHARED_CHUNK_Y) {

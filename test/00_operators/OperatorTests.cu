@@ -1555,7 +1555,7 @@ TYPED_TEST(OperatorTestsAllExecs, OperatorFuncs)
 
   TestType c = GenerateData<TestType>();
   TestType d = c;
-  TestType z = 0;
+  TestType z = static_cast<inner_op_type_t<TestType>::type>(0);
   tiv0() = c;
 
   auto tov00 = make_tensor<TestType>({});
@@ -1897,14 +1897,14 @@ TYPED_TEST(OperatorTestsNumericAllExecs, OperatorFuncs)
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c));
 
-  TestType p = 2.0f;
+  TestType p = static_cast<inner_type_t<TestType>::type>(2.0f);
   // example-begin pow-test-1
   (tov0 = as_type<TestType>(pow(tiv0, p))).run(exec);
   // example-end pow-test-1
   cudaStreamSynchronize(0);
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_pow(c, p)));
 
-  TestType three = 3.0f;
+  TestType three = static_cast<inner_type_t<TestType>::type>(3.0f);
 
   (tov0 = tiv0 * tiv0 * (tiv0 + tiv0) / tiv0 + three).run();
   cudaStreamSynchronize(0);
@@ -2339,8 +2339,8 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, ComplexTypeCompatibility)
   // Subtract complex from scalar
   for (index_t i = 0; i < count; i++) {
     fview(i) = static_cast<float>(i + 1);
-    dview(i) = {static_cast<detail::value_promote_t<TestType>>(i),
-                static_cast<detail::value_promote_t<TestType>>(i)};
+    dview(i)(static_cast<detail::value_promote_t<TestType>>(i),
+                static_cast<detail::value_promote_t<TestType>>(i));
   }
 
   (dview = fview - dview).run(exec);
@@ -3270,7 +3270,7 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, HermitianTranspose)
   tensor_t<TestType, 2> t2s({count1, count0});
   for (index_t i = 0; i < count0; i++) {
     for (index_t j = 0; j < count1; j++) {
-      TestType tmp = {(float)i, (float)-j};
+      TestType tmp{(float)i, (float)-j};
       t2(i, j) = tmp;
     }
   }
@@ -3307,7 +3307,7 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, PlanarTransform)
   tensor_t<typename TestType::value_type, 2> t2p({m * 2, k});
   for (index_t i = 0; i < m; i++) {
     for (index_t j = 0; j < k; j++) {
-      TestType tmp = {(float)i, (float)-j};
+      TestType tmp{(float)i, (float)-j};
       t2(i, j) = tmp;
     }
   }
